@@ -13,7 +13,6 @@
 - [Descripción](#-descripción)
 - [Características](#-características)
 - [Tecnologías](#️-tecnologías)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Instalación](#-instalación)
 - [Uso](#-uso)
 - [Dataset](#-dataset)
