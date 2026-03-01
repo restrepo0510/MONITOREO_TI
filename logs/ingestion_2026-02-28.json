@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-02-28T22:49:46.907396",
+    "status": "WARNING",
+    "file": "data/raw/MetroPT3(AirCompressor).csv",
+    "metrics": {
+        "total_records": 1516948,
+        "total_columns": 17,
+        "expected_columns_found": false,
+        "missing_columns": [
+            "Oil_Temperature",
+            "Flowmeter",
+            "Motor_Current",
+            "DV_electric",
+            "TOWERS",
+            "Oil_Level",
+            "gpsLong",
+            "gpsLat",
+            "gpsSpeed",
+            "gpsQuality"
+        ]
+    },
+    "execution_time_seconds": 4.73
+}
