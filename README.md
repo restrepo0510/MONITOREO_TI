@@ -391,6 +391,19 @@ El sistema está dividido en módulos independientes. Cada módulo tiene una res
 - **Dashboard (`src/dashboard/`)**: visualiza resultados y permite exploración por tiempo/señales.  
   **Consume:** resultados precomputados (score/nivel). El dashboard no recalcula features ni entrena modelos.
 ---
+```mermaid
+flowchart LR
+  A[data/raw/MetroPT3.csv] --> B[src/ingesta/loader.py]
+  B --> C[data/processed/base.parquet]
+  C --> D[src/preprocessing/feature_engineering.py]
+  D --> E[data/processed/features.parquet]
+  E --> F[src/analysis/risk_prediction.py]
+  F --> G[data/processed/scores.parquet]
+  G --> H[src/dashboard/app.py]
+
+  B --> L[logs/ingestion_*.json]
+```
+---
 ### 📁 Contratos de archivos (entradas/salidas)
 
 - **Entrada (dataset):** `data/raw/MetroPT3.csv`
