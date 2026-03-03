@@ -1,0 +1,22 @@
+# Data (no se sube a Git)
+data/raw/
+data/processed/
+
+# Logs
+logs/
+
+# Outputs temporales
+outputs/
+*.parquet
+*.csv
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
