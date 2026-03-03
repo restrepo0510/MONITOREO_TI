@@ -25,7 +25,7 @@
 
 ## 🎯 Descripción
 
-Este proyecto desarrolla un **sistema prototipo de mantenimiento predictivo** que utiliza técnicas de aprendizaje automático para anticipar fallas en equipos críticos de infraestructura ferroviaria. El sistema procesa datos de telemetría en tiempo real de 20 variables (sensores analógicos, señales digitales y GPS) para:
+Este proyecto desarrolla un **sistema prototipo de mantenimiento predictivo** que utiliza técnicas de aprendizaje automático para anticipar fallas en equipos críticos de infraestructura ferroviaria. El sistema procesa datos de telemetría en tiempo real de 17 variables (sensores analógicos, señales digitales y GPS) para:
 
 - 🔍 **Detectar anomalías** en el comportamiento operativo
 - 📊 **Predecir riesgo de falla** con 2+ horas de anticipación
