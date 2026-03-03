@@ -451,7 +451,7 @@ Usamos **una rama por tarea**. El nombre debe decir qué se está haciendo.
    - hacemos merge a `main` (ideal: **Squash and merge**)
    - borramos la rama remota después del merge
 3) Después del merge, todos actualizan su `main`:
-```bash
+   
 git checkout main
 git pull origin main
 ---
