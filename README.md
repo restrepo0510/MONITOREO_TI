@@ -375,7 +375,22 @@ El dataset contiene **3 fallas catastróficas** con timestamps exactos:
 * [ ] README final: pasos mínimos para correr (instalar → ejecutar → ver dashboard)
 
 ---
+## 🧩 Arquitectura modular
 
+El sistema está dividido en módulos independientes. Cada módulo tiene una responsabilidad única y se comunica con el siguiente mediante salidas definidas (contratos), para mantener bajo acoplamiento y permitir trabajo en paralelo.
+
+- **Ingesta (`src/ingesta/`)**: carga el dataset y valida/normaliza el formato mínimo (estructura y tiempo).  
+  **Entrega:** datos base estandarizados y ordenados por tiempo para el resto del pipeline.
+
+- **Preprocesamiento (`src/preprocessing/`)**: segmenta en ventanas temporales y genera features.  
+  **Entrega:** una tabla por ventanas con variables derivadas listas para análisis.
+
+- **Análisis / Scoring (`src/analysis/`)**: calcula score de riesgo/anomalía y asigna nivel (Normal / Observación / Alto).  
+  **Entrega:** una tabla por ventanas con score y nivel, lista para consumo.
+
+- **Dashboard (`src/dashboard/`)**: visualiza resultados y permite exploración por tiempo/señales.  
+  **Consume:** resultados precomputados (score/nivel). El dashboard no recalcula features ni entrena modelos.
+---
 ## 📚 Referencias
 
 ### Papers Académicos
