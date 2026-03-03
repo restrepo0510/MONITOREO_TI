@@ -375,7 +375,7 @@ El dataset contiene **3 fallas catastróficas** con timestamps exactos:
 * [ ] README final: pasos mínimos para correr (instalar → ejecutar → ver dashboard)
 
 ---
-## 🧩 Arquitectura modular
+## 🧩 Arquitectura modular 
 
 El sistema está dividido en módulos independientes. Cada módulo tiene una responsabilidad única y se comunica con el siguiente mediante salidas definidas (contratos), para mantener bajo acoplamiento y permitir trabajo en paralelo.
 
@@ -391,6 +391,17 @@ El sistema está dividido en módulos independientes. Cada módulo tiene una res
 - **Dashboard (`src/dashboard/`)**: visualiza resultados y permite exploración por tiempo/señales.  
   **Consume:** resultados precomputados (score/nivel). El dashboard no recalcula features ni entrena modelos.
 ---
+### 📁 Contratos de archivos (entradas/salidas)
+
+- **Entrada (dataset):** `data/raw/MetroPT3.csv`
+- **Salida de ingesta:** `data/processed/base.parquet`
+- **Salida de preprocesamiento (features):** `data/processed/features.parquet`
+- **Salida de análisis (scores):** `data/processed/scores.parquet`
+- *(Opcional)* **Salida de alertas:** `data/processed/alerts.parquet`
+
+> Nota: estos archivos no se versionan en Git (se generan localmente).
+---
+
 ## 📚 Referencias
 
 ### Papers Académicos
