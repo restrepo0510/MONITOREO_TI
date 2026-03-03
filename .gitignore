@@ -1,6 +1,10 @@
-# Data (no se sube a Git)
-data/raw/
-data/processed/
+# Data (no se sube a Git) - ignorar contenido, no carpetas
+data/raw/*
+data/processed/*
+
+# Mantener estructura en Git
+!data/raw/.gitkeep
+!data/processed/.gitkeep
 
 # Logs
 logs/
@@ -20,3 +24,4 @@ venv/
 
 # Jupyter
 .ipynb_checkpoints/
+
