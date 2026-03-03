@@ -478,7 +478,20 @@ git pull origin main
 - [Pandas Documentation](https://pandas.pydata.org/docs/)
 
 ---
+## ⚙️ Configuración del Sistema
 
+El sistema utiliza una configuración centralizada (`src/config.py`) que desacopla parámetros críticos de la lógica de negocio. Esto permite modificar comportamiento sin alterar módulos internos.
+
+### Parámetros principales
+
+- **Rutas**: Ubicación de datos crudos, datasets procesados y logs.
+- **Ventana temporal (`WINDOW_SIZE_SECONDS`)**: Tamaño de los bloques de tiempo utilizados para generar características a partir de los sensores.
+- **Horizonte de predicción (`PREDICTION_HORIZON_MINUTES`)**: Tiempo mínimo de anticipación con el que el modelo intenta predecir una falla (alineado con el objetivo de 2 horas definido).
+- **Umbrales de riesgo (`RISK_THRESHOLD_*`)**: Valores que determinan cuándo se genera una alerta de riesgo Medio o Alto.
+- **Configuración de monitoreo**: Parámetros del dashboard y trazabilidad del sistema.
+
+Esta estructura garantiza coherencia entre los objetivos definidos en el documento técnico y su implementación en código.
+---
 ## 📄 Licencia
 
 Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
