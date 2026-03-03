@@ -404,6 +404,56 @@ flowchart LR
   B --> L[logs/ingestion_*.json]
 ```
 ---
+## 🌿 Workflow Git (ramas, commits y merges)
+
+### Rama principal
+- **`main`**: siempre estable. Solo entra código que corre.
+
+### ¿Cuándo usar cada tipo de rama?
+Usamos **una rama por tarea**. El nombre debe decir qué se está haciendo.
+
+#### `feature/` (nueva funcionalidad)
+Úsala cuando agregas algo nuevo.
+**Ejemplos:**
+- `feature/dashboard-vista-general` → crear la vista general en Streamlit
+- `feature/pipeline-runner` → agregar `run_pipeline.py`
+- `feature/alerts-history` → generar historial de alertas
+
+#### `fix/` (corrección de bug)
+Úsala cuando algo ya existe pero está mal.
+**Ejemplos:**
+- `fix/loader-timestamps` → corregir parsing/orden de timestamps
+- `fix/dashboard-filter-crash` → arreglar error al filtrar por fecha
+- `fix/feature-window-size` → arreglar cálculo de ventanas
+
+#### `docs/` (solo documentación)
+Úsala cuando solo cambias README o documentación (sin tocar código).
+**Ejemplos:**
+- `docs/architecture-diagram` → agregar diagrama Mermaid al README
+- `docs/how-to-run` → mejorar pasos de ejecución
+
+#### `chore/` (mantenimiento / configuración)
+Úsala para cambios “de mantenimiento” que no son feature ni bug.
+**Ejemplos:**
+- `chore/add-gitignore` → agregar `.gitignore`
+- `chore/requirements-update` → ajustar `requirements.txt`
+- `chore/repo-cleanup` → mover archivos, limpiar estructura
+
+### Proceso semanal (merge SOLO los martes)
+1) Durante la semana cada persona:
+   - crea una rama desde `main`
+   - hace commits pequeños
+   - hace `push` de su rama
+   - abre un Pull Request (PR) hacia `main`
+2) **Los martes en reunión**:
+   - revisamos PRs (rápido: “¿qué cambia?” + “¿corre?”)
+   - hacemos merge a `main` (ideal: **Squash and merge**)
+   - borramos la rama remota después del merge
+3) Después del merge, todos actualizan su `main`:
+```bash
+git checkout main
+git pull origin main
+---
 ### 📁 Contratos de archivos (entradas/salidas)
 
 - **Entrada (dataset):** `data/raw/MetroPT3.csv`
