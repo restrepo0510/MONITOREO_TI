@@ -285,35 +285,94 @@ El dataset contiene **3 fallas catastróficas** con timestamps exactos:
 - [x] Identificación de sensores predictivos
 - [x] Sistema de logging implementado
 
-### Sprint 2 (Semanas 3-4) 🔄
-- [ ] Feature engineering completo
-- [ ] Baseline de detección de anomalías
-- [ ] Modelo de clasificación inicial
-- [ ] Métricas de evaluación
+### Sprint 2 (Semanas 3–4) 🔄 — Baseline + pipeline de scoring
 
-### Sprint 3 (Semanas 5-6) ⏳
-- [ ] Optimización de hiperparámetros
-- [ ] Sistema de alertas
-- [ ] Health index por tren
-- [ ] Dashboard básico
+**Ciencia de Datos**
 
-### Sprint 4 (Semanas 7-8) ⏳
-- [ ] Vista de flota completa
-- [ ] Vista detallada por tren
-- [ ] Integración modelo-dashboard
-- [ ] Testing end-to-end
+* [ ] Definir ventana(s) de análisis y esquema de features por ventana
+* [ ] Implementar generación de features (versión 1)
+* [ ] Implementar baseline de detección/riesgo (score)
+* [ ] Definir criterio de “alerta válida” (≥ 2 horas antes) y calcular métricas base (recall/anticipación)
+* [ ] Guardar salida estándar del modelo (score + nivel por ventana)
 
-### Sprint 5 (Semanas 9-10) ⏳
-- [ ] Refinamiento de UX
-- [ ] Optimización de performance
-- [ ] Documentación técnica
-- [ ] Preparación de demo
+**Ingeniería de Sistemas**
 
-### Sprint 6 (Semana 11) ⏳
-- [ ] Testing final
-- [ ] Deployment local
-- [ ] Documentación de usuario
-- [ ] Presentación final
+* [ ] Crear configuración central (rutas, tamaño de ventana, parámetros)
+* [ ] Implementar comando único para correr pipeline end-to-end (batch)
+* [ ] Persistir datos procesados y resultados (SQLite o Parquet/CSV)
+* [ ] Actualizar README: instalación + “cómo correr el pipeline”
+
+---
+
+### Sprint 3 (Semanas 5–6) ⏳ — Front MVP consumiendo resultados
+
+**Ciencia de Datos**
+
+* [ ] Definir cuáles señales/variables se visualizan por defecto (top 5–8)
+* [ ] Definir cómo se traduce `score → nivel` (Normal/Obs/Alto) para el front
+* [ ] Validar consistencia temporal: score alineado con ventanas y timestamps
+* [ ] Preparar dataset/tabla final que el dashboard consultará (sin recalcular)
+
+**Ingeniería de Sistemas**
+
+* [ ] Montar app Streamlit base + navegación
+* [ ] Implementar Vista General (estado agregado + ranking por riesgo)
+* [ ] Implementar Vista Detalle (señales + score en el tiempo)
+* [ ] Filtros básicos (rango de tiempo, selección de señales)
+* [ ] Conectar el dashboard a la fuente persistida (SQLite/Parquet/CSV)
+
+---
+
+### Sprint 4 (Semanas 7–8) ⏳ — Calibración + evaluación formal + front actualizado
+
+**Ciencia de Datos**
+
+* [ ] Definir periodos “sin falla” para medir falsos positivos
+* [ ] Calibrar umbrales/regla de alerta para reducir FP (manteniendo recall)
+* [ ] Evaluar formalmente: recall por intervalos, FP rate, anticipación promedio
+* [ ] Iterar 1 mejora simple del baseline (sin complejidad excesiva) y comparar
+
+**Ingeniería de Sistemas**
+
+* [ ] Agregar “estado/alerta” visible y consistente en ambas vistas
+* [ ] Mostrar causa/criterio de alerta (por qué quedó en Alto)
+* [ ] Optimizar carga (cache/lectura eficiente, no recalcular en front)
+* [ ] Asegurar que el pipeline genere automáticamente los artefactos que el front necesita
+
+---
+
+### Sprint 5 (Semanas 9–10) ⏳ — Alertas operativas + robustez end-to-end
+
+**Ciencia de Datos**
+
+* [ ] Definir lógica de alertas por niveles (Normal/Obs/Alto) con regla estable
+* [ ] Ajustar sensibilidad para evitar fatiga (demasiadas alertas)
+* [ ] Validar estabilidad temporal (alertas consistentes, sin oscilación excesiva)
+* [ ] Congelar versión de parámetros (umbrales/reglas) para demo final
+
+**Ingeniería de Sistemas**
+
+* [ ] Implementar historial de alertas (persistido)
+* [ ] Panel “últimas alertas” en el dashboard + filtros por nivel
+* [ ] Robustecer ejecución (manejo de errores, mensajes claros, rutas estándar)
+* [ ] Prueba end-to-end repetible desde cero (setup → pipeline → dashboard)
+
+---
+
+### Sprint 6 (Semana 11) ⏳ — Estabilización + empaquetado local
+
+**Ciencia de Datos**
+
+* [ ] Verificación final de métricas vs KR (recall/FP/anticipación)
+* [ ] Ajuste final de umbrales/regla (solo si mejora sin romper estabilidad)
+* [ ] Validación final con escenarios: fallas y no-fallas
+
+**Ingeniería de Sistemas**
+
+* [ ] Congelar dependencias (`requirements.txt`) y versiones
+* [ ] “One command run” definitivo (pipeline + arranque del front)
+* [ ] Limpieza del repo (archivos temporales fuera, estructura final)
+* [ ] README final: pasos mínimos para correr (instalar → ejecutar → ver dashboard)
 
 ---
 
