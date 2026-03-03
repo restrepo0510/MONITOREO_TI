@@ -1,8 +1,6 @@
-# Data (no se sube a Git) - ignorar contenido, no carpetas
+# Data (ignorar contenido, mantener carpetas)
 data/raw/*
 data/processed/*
-
-# Mantener estructura en Git
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
@@ -11,10 +9,6 @@ logs/
 
 # Outputs temporales
 outputs/
-*.parquet
-*.csv
-*.db
-*.sqlite
 
 # Python
 __pycache__/
@@ -24,4 +18,3 @@ venv/
 
 # Jupyter
 .ipynb_checkpoints/
-
