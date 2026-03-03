@@ -100,6 +100,7 @@ Nuestro enfoque **predictivo** permite:
 - Python 3.10 o superior
 - pip (gestor de paquetes de Python)
 - Git
+- pip install -r requirements.txt
 
 ### Paso 1: Clonar el repositorio
 
