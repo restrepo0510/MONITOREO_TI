@@ -1,6 +1,13 @@
 import os
 import json
+<<<<<<< HEAD
 import sqlite3
+=======
+<<<<<<< HEAD
+=======
+import sqlite3
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
 import pandas as pd
 from datetime import datetime
 
@@ -12,11 +19,23 @@ class ModelOutputSaver:
     Responsabilidades:
     - Leer el archivo con risk_score y risk_level generado por RiskPredictor.
     - Seleccionar y estructurar las columnas de salida estándar.
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    - Guardar el resultado final en formato Parquet y CSV.
+    - Generar log JSON estructurado por ejecución.
+
+=======
+>>>>>>> feature/IN-15-BASELINE-RIESGO
     - Guardar el resultado final en formato Parquet, CSV y SQLite.
     - Generar log JSON estructurado por ejecución.
 
     Este módulo NO calcula scores ni modelos.
     Solo toma la salida del modelo y la persiste de forma organizada.
+<<<<<<< HEAD
+=======
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
     """
 
     def __init__(
@@ -24,7 +43,14 @@ class ModelOutputSaver:
         input_path="data/processed/risk_scores.parquet",
         output_parquet="data/output/model_output.parquet",
         output_csv="data/output/model_output.csv",
+<<<<<<< HEAD
         output_sqlite="data/output/model_output.db",
+=======
+<<<<<<< HEAD
+=======
+        output_sqlite="data/output/model_output.db",
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
         log_dir="logs",
     ):
         # Archivo generado por RiskPredictor (IN-15)
@@ -35,13 +61,34 @@ class ModelOutputSaver:
 
         self.output_csv = output_csv
 
+<<<<<<< HEAD
         # Salida en SQLite para consultas SQL sobre los resultados
         self.output_sqlite = output_sqlite
 
+=======
+<<<<<<< HEAD
+=======
+        # Salida en SQLite para consultas SQL sobre los resultados
+        self.output_sqlite = output_sqlite
+
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
         # Carpeta de logs
         self.log_dir = log_dir
 
         # Columnas que conforman la salida estándar del modelo
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        # timestamp: identifica la ventana temporal
+        # risk_score: valor numérico entre 0 y 1
+        # risk_level: categoría BAJO / MEDIO / ALTO
+        self.output_columns = ["timestamp", "risk_score", "risk_level"]
+
+    def run(self):
+        """
+=======
+>>>>>>> feature/IN-15-BASELINE-RIESGO
         self.output_columns = ["timestamp", "risk_score", "risk_level"]
 
     def _save_to_sqlite(self, df):
@@ -75,11 +122,23 @@ class ModelOutputSaver:
         """
         Ejecuta el pipeline de persistencia de salida.
 
+<<<<<<< HEAD
+=======
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
         Flujo:
         1. Carga el archivo con scores y niveles de riesgo.
         2. Valida que las columnas de salida existan.
         3. Selecciona solo las columnas estándar de salida.
+<<<<<<< HEAD
         4. Guarda en Parquet, CSV y SQLite.
+=======
+<<<<<<< HEAD
+        4. Guarda en Parquet y CSV.
+=======
+        4. Guarda en Parquet, CSV y SQLite.
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
         5. Genera log estructurado.
         """
 
@@ -87,14 +146,30 @@ class ModelOutputSaver:
         run_id = start_time.strftime("%Y-%m-%d_%H-%M-%S")
 
         try:
+<<<<<<< HEAD
             
+=======
+<<<<<<< HEAD
+            # Verificar que el archivo de entrada exista
+=======
+            
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
             if not os.path.exists(self.input_path):
                 raise FileNotFoundError(
                     f"No se encontró {self.input_path}. "
                     "Ejecuta primero src/analysis/risk_prediction.py"
                 )
 
+<<<<<<< HEAD
             
+=======
+<<<<<<< HEAD
+            # Cargar resultado del modelo
+=======
+            
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
             df = pd.read_parquet(self.input_path)
 
             # Validar que las columnas necesarias existan
@@ -107,6 +182,26 @@ class ModelOutputSaver:
             # Seleccionar solo las columnas de salida estándar
             df_output = df[self.output_columns].copy()
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+            # Ordenar por timestamp para coherencia temporal
+            df_output = df_output.sort_values("timestamp").reset_index(drop=True)
+
+            # Crear carpeta de salida si no existe
+            os.makedirs(os.path.dirname(self.output_parquet), exist_ok=True)
+
+            # Guardar en Parquet 
+            df_output.to_parquet(self.output_parquet, index=False)
+
+            df_output.to_csv(self.output_csv, index=False)
+
+            end_time = datetime.now()
+            exec_time = round((end_time - start_time).total_seconds(), 2)
+
+            # Distribución de niveles para el log
+=======
+>>>>>>> feature/IN-15-BASELINE-RIESGO
             df_output = df_output.sort_values("timestamp").reset_index(drop=True)
 
             os.makedirs(os.path.dirname(self.output_parquet), exist_ok=True)
@@ -122,6 +217,10 @@ class ModelOutputSaver:
             end_time = datetime.now()
             exec_time = round((end_time - start_time).total_seconds(), 2)
 
+<<<<<<< HEAD
+=======
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
             dist = df_output["risk_level"].value_counts().to_dict()
 
             # Log estructurado
@@ -133,7 +232,14 @@ class ModelOutputSaver:
                 "input_file": self.input_path,
                 "output_parquet": self.output_parquet,
                 "output_csv": self.output_csv,
+<<<<<<< HEAD
                 "output_sqlite": self.output_sqlite,
+=======
+<<<<<<< HEAD
+=======
+                "output_sqlite": self.output_sqlite,
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
                 "metrics": {
                     "records_saved": int(len(df_output)),
                     "risk_distribution": dist,
@@ -156,7 +262,14 @@ class ModelOutputSaver:
             print(f"Archivos generados:")
             print(f"  → {self.output_parquet}")
             print(f"  → {self.output_csv}")
+<<<<<<< HEAD
             print(f"  → {self.output_sqlite}")
+=======
+<<<<<<< HEAD
+=======
+            print(f"  → {self.output_sqlite}")
+>>>>>>> origin/feature/IN-19-persistir-datos
+>>>>>>> feature/IN-15-BASELINE-RIESGO
             print(f"Tiempo de ejecución: {exec_time} segundos")
 
             return df_output
