@@ -233,12 +233,12 @@ El dashboard estará disponible en: `http://localhost:8501`
 
 El dataset contiene **3 fallas catastróficas** con timestamps exactos:
 
-| Falla | Tipo | Fecha | Duración | Componente Afectado |
-|-------|------|-------|----------|---------------------|
-| **Falla 1** | Fuga de aire (clientes) | 28 Feb - 1 Mar 2022 | ~24h | Tubería de alimentación |
-| **Falla 2** | Fuga de aire (secador) | 23 Mar 2022 | ~3h | Válvula piloto neumática |
-| **Falla 3** | Fuga de aceite | 30 May - 2 Jun 2022 | ~72h | Motor del compresor |
-
+| Falla | Tipo | Fecha | Duración |
+|-------|------|-------|----------|
+| **Falla 1** | Fuga de aire Alto estrés| 18 Abril -  18 Abril 2020 | ~24h | 
+| **Falla 2** | Fuga de aire Mantenimiento de alto estrés |  29 May - 30 Mayo 2020 | ~6:30h |
+| **Falla 3** | Fuga de aire Mantenimiento de alto estrés | 5 Jun - 7 Jun 2020 | ~1:30h |
+| **Falla 4** | Fuga de aire Mantenimiento de alto estrés| 15 Jul - 15 Jul 2020 | ~4:30h | 
 ---
 
 ## 🎯 Resultados Esperados
