@@ -196,9 +196,9 @@ El dashboard estará disponible en: `http://localhost:8501`
 
 **Descripción:**
 - 🚆 Datos reales del Metro de Porto, Portugal
-- 📅 Periodo: Enero - Junio 2022
-- 📏 Tamaño: 10,979,547 registros × 20 variables
-- ⚙️ Frecuencia: 1 Hz (1 registro por segundo)
+- 📅 Periodo: febrero 1 - Octubre 1 2020
+- 📏 Tamaño: 1,516,949 registros × 16 variables
+- ⚙️ Frecuencia: 1 Hz (1 registro cada 10 segundos)
 - 🔧 Componente: Air Production Unit (APU) de tren
 
 ### Variables del Dataset
@@ -223,15 +223,9 @@ El dashboard estará disponible en: `http://localhost:8501`
 15. **Oil_Level**: Nivel de aceite bajo
 16. **Caudal_impulses**: Impulsos de flujo por segundo
 
-#### GPS (4)
-17. **gpsLong**: Longitud (°)
-18. **gpsLat**: Latitud (°)
-19. **gpsSpeed**: Velocidad (km/h)
-20. **gpsQuality**: Calidad de señal
-
 ### Fallas Documentadas
 
-El dataset contiene **3 fallas catastróficas** con timestamps exactos:
+El dataset contiene **4 fallas catastróficas** con timestamps exactos:
 
 | Falla | Tipo | Fecha | Duración |
 |-------|------|-------|----------|
