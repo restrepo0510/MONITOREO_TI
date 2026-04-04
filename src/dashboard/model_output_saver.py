@@ -37,6 +37,12 @@ class ModelOutputSaver:
         # Carpeta de logs
         self.log_dir = log_dir
 
+        # IMPORTANTE:
+        # Este módulo genera salidas "resumen" para integración/consumo externo.
+        # El dashboard principal de monitoreo usa data/processed/risk_scores.parquet
+        # como fuente oficial porque necesita columnas detalladas de sensores.
+        # (Ver src/config.py -> DASHBOARD_SOURCE_OF_TRUTH_PATH)
+
         # Columnas que conforman la salida estándar del modelo
         # timestamp: identifica la ventana temporal
         # risk_score: valor numérico entre 0 y 1

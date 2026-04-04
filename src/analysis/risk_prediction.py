@@ -4,6 +4,20 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
+try:
+    from src.config import (
+        RISK_THRESHOLD_HIGH,
+        RISK_THRESHOLD_MEDIUM,
+        RISK_SCALER_PARAMS_PATH,
+        RISK_SCALER_REUSE_PARAMS,
+    )
+except Exception:
+    # Fallback para ejecución aislada del módulo.
+    RISK_THRESHOLD_HIGH = 0.7
+    RISK_THRESHOLD_MEDIUM = 0.4
+    RISK_SCALER_PARAMS_PATH = "data/processed/risk_scaler_params.json"
+    RISK_SCALER_REUSE_PARAMS = True
+
 
 class RiskPredictor:
     """
@@ -18,9 +32,11 @@ class RiskPredictor:
 
     def __init__(
         self,
-        input_path="data/processed/base.parquet",
+        input_path="data/processed/features.parquet",
         output_path="data/processed/risk_scores.parquet",
         log_dir="logs",
+        scaler_params_path=RISK_SCALER_PARAMS_PATH,
+        reuse_scaler_params=RISK_SCALER_REUSE_PARAMS,
     ):
         # Ruta del dataset procesado generado por el módulo de ingesta
         self.input_path = input_path
@@ -29,23 +45,115 @@ class RiskPredictor:
 
         self.log_dir = log_dir
 
+        # Ruta donde se persisten parámetros del escalado de score.
+        # Estos parámetros permiten estabilidad entre ejecuciones.
+        self.scaler_params_path = scaler_params_path
+
+        # Define si reutilizar parámetros persistidos.
+        # True evita drift por recalcular min/max global en cada corrida.
+        self.reuse_scaler_params = reuse_scaler_params
+
         # Sensores relevantes identificados en IN-3
         self.sensor_cols = [
-            "TP2",
-            "TP3",
-            "H1",
-            "DV_pressure",
-            "Reservoirs",
-            "Oil_Temperature",
-            "Motor_Current",
+            "TP2_mean",
+            "TP3_mean",
+            "H1_mean",
+            "DV_pressure_mean",
+            "Reservoirs_mean",
+            "Oil_Temperature_mean",
+            "Motor_Current_mean",
         ]
 
         # Umbrales para clasificar nivel de riesgo
         # Score >= 0.7 → ALTO, >= 0.4 → MEDIO, < 0.4 → BAJO
-        self.threshold_high = 0.7
-        self.threshold_medium = 0.4
+        self.threshold_high = RISK_THRESHOLD_HIGH
+        self.threshold_medium = RISK_THRESHOLD_MEDIUM
 
-    def compute_risk_score(self, df):
+    def _compute_raw_score(self, df, sensor_params):
+        """
+        Calcula raw_score (promedio de z-scores absolutos) usando
+        parámetros explícitos por sensor (mean/std).
+        """
+        z_scores = pd.DataFrame(index=df.index)
+
+        for col, stats in sensor_params.items():
+            if col in df.columns:
+                mean = float(stats["mean"])
+                std = float(stats["std"])
+                if std > 0:
+                    z_scores[col] = (df[col] - mean).abs() / std
+                else:
+                    z_scores[col] = 0.0
+
+        if z_scores.empty:
+            return pd.Series(0.0, index=df.index)
+
+        return z_scores.mean(axis=1)
+
+    def _fit_scaler_params(self, df, available_sensors):
+        """
+        Ajusta parámetros de escalado una sola vez (calibración) y devuelve:
+        - mean/std por sensor
+        - min/max del raw_score de calibración
+        """
+        sensor_params = {}
+        for col in available_sensors:
+            mean = float(df[col].mean())
+            std = float(df[col].std())
+            if std <= 0:
+                std = 1.0
+            sensor_params[col] = {"mean": mean, "std": std}
+
+        raw_score = self._compute_raw_score(df, sensor_params)
+        raw_min = float(raw_score.min()) if len(raw_score) else 0.0
+        raw_max = float(raw_score.max()) if len(raw_score) else 1.0
+        if raw_max <= raw_min:
+            raw_max = raw_min + 1.0
+
+        return {
+            "version": 1,
+            "created_at": datetime.now().isoformat(),
+            "sensor_params": sensor_params,
+            "raw_score_min": raw_min,
+            "raw_score_max": raw_max,
+        }
+
+    def _save_scaler_params(self, params):
+        """
+        Persiste parámetros de escalado para reutilizarlos en corridas futuras.
+        """
+        os.makedirs(os.path.dirname(self.scaler_params_path), exist_ok=True)
+        with open(self.scaler_params_path, "w", encoding="utf-8") as f:
+            json.dump(params, f, indent=4, ensure_ascii=False)
+
+    def _load_scaler_params(self):
+        """
+        Carga parámetros persistidos si existen.
+        """
+        if not os.path.exists(self.scaler_params_path):
+            return None
+        with open(self.scaler_params_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def _resolve_scaler_params(self, df, available_sensors):
+        """
+        Decide entre reutilizar parámetros guardados o recalibrar.
+        Devuelve: (params, scaler_source)
+        """
+        if self.reuse_scaler_params:
+            loaded = self._load_scaler_params()
+            if loaded:
+                loaded_sensors = set(loaded.get("sensor_params", {}).keys())
+                required_sensors = set(available_sensors)
+                if required_sensors.issubset(loaded_sensors):
+                    return loaded, "reused"
+                print("Advertencia: scaler guardado incompleto para sensores actuales. Recalibrando...")
+
+        fitted = self._fit_scaler_params(df, available_sensors)
+        self._save_scaler_params(fitted)
+        return fitted, "fitted"
+
+    def compute_risk_score(self, df, scaler_params=None):
         """
         Calcula un score de riesgo entre 0 y 1 por cada fila.
 
@@ -56,29 +164,25 @@ class RiskPredictor:
         - Un score alto indica comportamiento anómalo simultáneo en varios sensores.
         """
 
-        z_scores = pd.DataFrame(index=df.index)
+        if scaler_params is None:
+            # Compatibilidad con comportamiento previo (si no se pasa scaler).
+            available_sensors = [c for c in self.sensor_cols if c in df.columns]
+            scaler_params = self._fit_scaler_params(df, available_sensors)
 
-        for col in self.sensor_cols:
-            if col in df.columns:
-                mean = df[col].mean()
-                std = df[col].std()
-                if std > 0:
-                    z_scores[col] = (df[col] - mean).abs() / std
-                else:
-                    z_scores[col] = 0.0
+        sensor_params = scaler_params.get("sensor_params", {})
+        raw_score = self._compute_raw_score(df, sensor_params)
 
-        # Promedio de z-scores por fila
-        raw_score = z_scores.mean(axis=1)
+        min_s = float(scaler_params.get("raw_score_min", 0.0))
+        max_s = float(scaler_params.get("raw_score_max", 1.0))
 
-        # Normalizar entre 0 y 1 usando min-max
-        min_s = raw_score.min()
-        max_s = raw_score.max()
+        # Normalización estable usando parámetros persistidos.
         if max_s > min_s:
             score = (raw_score - min_s) / (max_s - min_s)
         else:
             score = pd.Series(0.0, index=df.index)
 
-        return score
+        # Acotar a [0, 1] evita desborde cuando aparezcan valores extremos.
+        return score.clip(lower=0.0, upper=1.0)
 
     def assign_risk_level(self, score):
         """
@@ -122,7 +226,11 @@ class RiskPredictor:
 
             # Cargar dataset
             df = pd.read_parquet(self.input_path)
-
+            # asegurar timestamp como columna
+            if "timestamp" not in df.columns:
+                df = df.reset_index()
+            assert "timestamp" in df.columns, "timestamp sigue faltando"
+            
             # Validar sensores disponibles
             available_sensors = [c for c in self.sensor_cols if c in df.columns]
             missing_sensors = [c for c in self.sensor_cols if c not in df.columns]
@@ -130,8 +238,11 @@ class RiskPredictor:
             if len(available_sensors) == 0:
                 raise ValueError("Ningún sensor relevante encontrado en el dataset.")
 
-            # Calcular score de riesgo
-            df["risk_score"] = self.compute_risk_score(df)
+            # Resolver parámetros de escalado (reusar o calibrar).
+            scaler_params, scaler_source = self._resolve_scaler_params(df, available_sensors)
+
+            # Calcular score de riesgo con parámetros estables.
+            df["risk_score"] = self.compute_risk_score(df, scaler_params=scaler_params)
 
             # Asignar nivel de riesgo
             df["risk_level"] = self.assign_risk_level(df["risk_score"])
@@ -140,6 +251,9 @@ class RiskPredictor:
             os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
 
             # Guardar resultado
+            if "timestamp" not in df.columns:
+                df = df.reset_index()
+
             df.to_parquet(self.output_path, index=False)
 
             end_time = datetime.now()
@@ -156,6 +270,8 @@ class RiskPredictor:
                 "status": "SUCCESS",
                 "input_file": self.input_path,
                 "output_file": self.output_path,
+                "scaler_params_path": self.scaler_params_path,
+                "scaler_source": scaler_source,
                 "metrics": {
                     "records_processed": int(len(df)),
                     "sensors_used": available_sensors,

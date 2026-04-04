@@ -1,5 +1,6 @@
 import streamlit as st
 import plotly.graph_objects as go
+from src.dashboard.theme import PALETTE, RISK_THRESHOLDS
 
 def render(df):
     st.title("🔍 Detalle de Señales")
@@ -21,25 +22,34 @@ def render(df):
 
     st.subheader(f"Score de Riesgo — {len(df_f):,} ventanas")
 
-    color_map = {"ALTO": "#e74c3c", "MEDIO": "#f39c12", "BAJO": "#2ecc71"}
-
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=df_f["timestamp"], y=df_f["risk_score"],
         mode="lines", name="Risk Score",
-        line=dict(color="#01696f", width=1.5),
-        fill="tozeroy", fillcolor="rgba(1,105,111,0.08)"
+        line=dict(color=PALETTE["steel_azure"], width=2),
+        fill="tozeroy", fillcolor="rgba(184,219,217,0.28)"
     ))
-    fig.add_hline(y=0.6, line_dash="dot", line_color="#f39c12",
-                  annotation_text="Umbral MEDIO (0.6)")
-    fig.add_hline(y=0.8, line_dash="dot", line_color="#e74c3c",
-                  annotation_text="Umbral ALTO (0.8)")
+    fig.add_hline(
+        y=RISK_THRESHOLDS["MEDIO"],
+        line_dash="dot",
+        line_color=PALETTE["yellow"],
+        annotation_text=f"Umbral MEDIO ({RISK_THRESHOLDS['MEDIO']:.1f})",
+    )
+    fig.add_hline(
+        y=RISK_THRESHOLDS["ALTO"],
+        line_dash="dot",
+        line_color=PALETTE["alert_red"],
+        annotation_text=f"Umbral ALTO ({RISK_THRESHOLDS['ALTO']:.1f})",
+    )
     fig.update_layout(
         height=420,
         xaxis_title="Timestamp",
         yaxis_title="Risk Score",
         yaxis=dict(range=[0, 1]),
-        margin=dict(t=20, b=20)
+        margin=dict(t=20, b=20),
+        paper_bgcolor=PALETTE["ghost_white"],
+        plot_bgcolor="white",
+        font=dict(color=PALETTE["black"]),
     )
     st.plotly_chart(fig, use_container_width=True)
 
