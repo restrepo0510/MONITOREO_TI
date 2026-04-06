@@ -15,6 +15,47 @@ from src.config import (
 PARQUET_PATH = DASHBOARD_SOURCE_OF_TRUTH_PATH
 SQLITE_PATH = DATA_MODEL_OUTPUT_SQLITE_PATH
 
+CANONICAL_SENSOR_ALIASES = {
+    "TP2": "TP2_mean",
+    "TP3": "TP3_mean",
+    "H1": "H1_mean",
+    "DV_pressure": "DV_pressure_mean",
+    "Reservoirs": "Reservoirs_mean",
+    "Oil_Temperature": "Oil_Temperature_mean",
+    "Motor_Current": "Motor_Current_mean",
+    "MPG": "MPG_last",
+    "TOWERS": "TOWERS_last",
+}
+
+
+def _apply_dashboard_aliases(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normaliza nombres de columnas para que el front y el motor de alertas
+    puedan consumir tanto datos crudos como columnas agregadas.
+    """
+    if df is None or df.empty:
+        return df
+
+    normalized = df.copy()
+
+    for raw_name, canonical_name in CANONICAL_SENSOR_ALIASES.items():
+        if raw_name in normalized.columns and canonical_name not in normalized.columns:
+            normalized[canonical_name] = pd.to_numeric(
+                normalized[raw_name], errors="coerce"
+            )
+
+    if "risk_score" in normalized.columns:
+        normalized["risk_score"] = pd.to_numeric(
+            normalized["risk_score"], errors="coerce"
+        ).fillna(0.0)
+
+    if "risk_level" in normalized.columns:
+        normalized["risk_level"] = (
+            normalized["risk_level"].astype(str).str.upper().fillna("BAJO")
+        )
+
+    return normalized
+
 @st.cache_data(ttl=60)
 def load_scores() -> pd.DataFrame:
     if os.path.exists(PARQUET_PATH):
@@ -45,4 +86,4 @@ def load_scores() -> pd.DataFrame:
             "risk_level": levels.astype(str)
         })
     df["timestamp"] = pd.to_datetime(df["timestamp"])
-    return df
+    return _apply_dashboard_aliases(df)
