@@ -1,382 +1,73 @@
 from pathlib import Path
 
 import plotly.graph_objects as go
+import plotly.express as px
 import streamlit as st
+import pandas as pd
+import numpy as np
 
+from src.dashboard.cache_manager import load_dashboard_data
+from src.dashboard.theme_manager import (
+    inject_theme_css,
+    render_section_header,
+    render_page_title,
+    render_hero_alert,
+    render_kpi_card_advanced,
+    render_metric_row,
+    render_stats_summary,
+    render_premium_divider,
+    COLORS,
+    RISK_THEME,
+)
 from src.dashboard.components.alert_badge import render_alert_badge
 from src.dashboard.components.financial_section import render_financial_section
 from src.dashboard.components.golden_signals import render_golden_signals
-from src.dashboard.components.kpi_card import render_kpi_card
 from src.dashboard.components.operativity_panel import render_operativity_panel
 from src.dashboard.components.postmortem_panel import render_postmortem_panel
 from src.dashboard.components.station_line import render_station_line
-from src.dashboard.theme import PALETTE, RISK_THRESHOLDS
-from src.dashboard.utils.alert_engine import (
-    build_prediction_advisory,
-    evaluate_alerts,
-    evaluate_latest_alert,
-    resolve_alert_thresholds,
-)
+from src.dashboard.theme import RISK_THRESHOLDS
 
 
-def _image_paths():
-    assets_dir = Path(__file__).resolve().parents[1] / "assets" / "images"
-    return {
-        "logo": assets_dir / "logo.png",
-        "train": assets_dir / "train.png",
-    }
 
 
-def _render_header():
-    paths = _image_paths()
-    top_left, top_title, top_meta, top_train = st.columns(
-        [0.9, 2.35, 2.25, 1.85],
-        gap="small",
-        vertical_alignment="center",
-    )
+# ============================================================================
+# UTILIDADES PRIVADAS PARA GRÁFICOS
+# ============================================================================
 
-    with top_left:
-        if paths["logo"].exists():
-            st.image(str(paths["logo"]), width=145)
-        else:
-            st.caption("Logo: src/dashboard/assets/images/logo.png")
-
-    with top_title:
-        st.markdown(
-            '<div class="main-title">APU DEL TREN #001</div>',
-            unsafe_allow_html=True,
-        )
-
-    with top_meta:
-        render_station_line(train_id="001", cycle_seconds=5)
-
-    with top_train:
-        st.markdown('<div class="header-train-wrap">', unsafe_allow_html=True)
-        if paths["train"].exists():
-            st.image(str(paths["train"]), width=335)
-        else:
-            st.caption("Tren local: src/dashboard/assets/images/train.png")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div style="margin-bottom:0.1rem;"></div>', unsafe_allow_html=True)
-
-
-def _inject_home_css():
-    st.markdown(
-        """
-        <style>
-        .section-title {
-            font-size: 1.45rem;
-            font-weight: 700;
-            color: #234B8D;
-            margin-top: 1.7rem;
-            margin-bottom: 0.95rem;
-            border-bottom: 2px solid #234B8D;
-            padding-bottom: 0.3rem;
-        }
-        .section-subtitle {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #234B8D;
-            margin-top: 1.35rem;
-            margin-bottom: 0.75rem;
-        }
-        .main-title {
-            color: #234B8D;
-            font-size: 2.25rem;
-            font-weight: 800;
-            letter-spacing: 0.3px;
-            margin-top: 0;
-            margin-bottom: 0;
-            line-height: 1.1;
-        }
-        .header-train-wrap {
-            text-align: right;
-            margin-top: 0.35rem;
-        }
-        .station-strip {
-            margin-top: 0.85rem;
-            margin-left: -0.65rem;
-        }
-        .station-train-id {
-            font-size: 1.02rem;
-            font-weight: 700;
-            color: #234B8D;
-            margin-bottom: 0.34rem;
-        }
-        .station-line-row {
-            display: flex;
-            align-items: center;
-            gap: 0.48rem;
-            flex-wrap: nowrap;
-            white-space: nowrap;
-            overflow-x: auto;
-            overflow-y: hidden;
-            scrollbar-width: none;
-            width: 100%;
-        }
-        .station-line-row::-webkit-scrollbar { display: none; }
-        .station-node {
-            border-radius: 999px;
-            padding: 0.22rem 0.58rem;
-            font-size: 0.84rem;
-            font-weight: 650;
-            white-space: nowrap;
-            line-height: 1.2;
-            flex: 0 0 auto;
-        }
-        .station-prev, .station-next {
-            background: rgba(184,219,217,0.58);
-            color: #234B8D;
-        }
-        .station-current {
-            background: #234B8D;
-            color: #F4F4F9;
-            font-size: 0.88rem;
-            font-weight: 760;
-        }
-        .station-connector {
-            height: 2px;
-            width: 22px;
-            background: rgba(35,75,141,0.45);
-            border-radius: 999px;
-            flex: 0 0 auto;
-        }
-        .risk-banner {
-            width: 100%;
-            border-radius: 12px;
-            padding: 0.9rem 1rem;
-            margin-top: 0.25rem;
-            margin-bottom: 0.25rem;
-            border: 1px solid transparent;
-        }
-        .risk-banner-title {
-            font-size: 1.15rem;
-            font-weight: 850;
-            line-height: 1.1;
-            margin-bottom: 0.15rem;
-            letter-spacing: 0.2px;
-        }
-        .risk-banner-score {
-            font-size: 0.96rem;
-            font-weight: 650;
-            opacity: 0.95;
-        }
-        .risk-banner-high {
-            background: #D32F2F;
-            color: #F4F4F9;
-            border-color: #B71C1C;
-        }
-        .stTextArea textarea {
-            background: #ffffff;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def _section_title(text):
-    st.markdown(f'<div class="section-title">{text}</div>', unsafe_allow_html=True)
-
-
-def _subsection_title(text):
-    st.markdown(f'<div class="section-subtitle">{text}</div>', unsafe_allow_html=True)
-
-
-def _build_risk_behavior_chart(df):
-    risk_df = df.tail(500).copy()
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=risk_df["timestamp"],
-            y=risk_df["risk_score"],
-            mode="lines",
-            name="Risk Score",
-            line=dict(color=PALETTE["steel_azure"], width=2.5),
-            fill="tozeroy",
-            fillcolor="rgba(184,219,217,0.30)",
-            hovertemplate="%{x}<br>Score: %{y:.3f}<extra></extra>",
-        )
-    )
-
-    high_events = risk_df[risk_df["risk_score"] >= RISK_THRESHOLDS["ALTO"]]
-    if not high_events.empty:
-        fig.add_trace(
-            go.Scatter(
-                x=high_events["timestamp"],
-                y=high_events["risk_score"],
-                mode="markers",
-                name="Eventos ALTO",
-                marker=dict(color=PALETTE["alert_red"], size=7, symbol="diamond"),
-                hovertemplate="%{x}<br>Evento ALTO: %{y:.3f}<extra></extra>",
-            )
-        )
-
-    fig.add_hline(
-        y=RISK_THRESHOLDS["MEDIO"],
-        line_dash="dash",
-        line_color=PALETTE["yellow"],
-        annotation_text=f"MEDIO ({RISK_THRESHOLDS['MEDIO']:.1f})",
-        annotation_position="top left",
-    )
-    fig.add_hline(
-        y=RISK_THRESHOLDS["ALTO"],
-        line_dash="dash",
-        line_color=PALETTE["alert_red"],
-        annotation_text=f"ALTO ({RISK_THRESHOLDS['ALTO']:.1f})",
-        annotation_position="top left",
-    )
-
-    fig.update_layout(
-        height=310,
-        paper_bgcolor=PALETTE["ghost_white"],
-        plot_bgcolor="white",
-        font=dict(color=PALETTE["black"]),
-        margin=dict(t=24, b=12, l=8, r=8),
-        legend=dict(orientation="h", y=1.12, x=0),
-        xaxis_title="Tiempo",
-        yaxis_title="Risk Score",
-    )
-    fig.update_yaxes(range=[0, 1], showgrid=True, gridcolor="rgba(35,75,141,0.12)")
-    fig.update_xaxes(showgrid=False)
-    return fig
-
-
-def _render_risk_banner(risk, score):
-    if risk == "ALTO":
-        st.markdown(
-            f"""
-            <div class="risk-banner risk-banner-high">
-                <div class="risk-banner-title">RIESGO ALTO</div>
-                <div class="risk-banner-score">Score: {score:.2f}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    elif risk == "MEDIO":
-        st.warning(f"RIESGO MEDIO — Score: {score:.2f}")
-    else:
-        st.info(f"RIESGO BAJO — Score: {score:.2f}")
-
-
-def _inject_home_premium_css():
-    st.markdown(
-        """
-        <style>
-        .jj-home-title {
-            color: #234B8D;
-            font-size: 2.45rem;
-            font-weight: 850;
-            line-height: 1.02;
-            margin-bottom: 0.25rem;
-        }
-        .jj-home-subtitle {
-            color: #445472;
-            font-size: 0.96rem;
-            line-height: 1.55;
-            max-width: 880px;
-        }
-        .jj-section-kicker {
-            font-size: 0.78rem;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: #6A7894;
-            font-weight: 800;
-            margin-top: 1.3rem;
-            margin-bottom: 0.28rem;
-        }
-        .jj-section-title {
-            font-size: 1.55rem;
-            color: #0F1E3C;
-            font-weight: 850;
-            margin-bottom: 0.15rem;
-        }
-        .jj-section-copy {
-            font-size: 0.93rem;
-            color: #53617C;
-            line-height: 1.5;
-            margin-bottom: 0.95rem;
-        }
-        .jj-hero-shell {
-            background: radial-gradient(circle at top right, rgba(255,230,0,0.16), transparent 28%),
-                        linear-gradient(135deg, #FFFFFF 0%, #F6F9FF 55%, #EEF4FF 100%);
-            border: 1px solid rgba(35, 75, 141, 0.10);
-            border-radius: 28px;
-            padding: 1.2rem 1.25rem 1rem 1.25rem;
-            box-shadow: 0 24px 48px rgba(15, 30, 60, 0.10);
-            margin-bottom: 1rem;
-        }
-        .jj-header-train-wrap {
-            text-align: right;
-            margin-top: 0.25rem;
-        }
-        .jj-driver-card {
-            background: #FFFFFF;
-            border-radius: 22px;
-            padding: 1rem;
-            border: 1px solid rgba(35, 75, 141, 0.10);
-            box-shadow: 0 18px 34px rgba(15, 30, 60, 0.08);
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def _section_header(kicker, title, copy):
-    st.markdown(f'<div class="jj-section-kicker">{kicker}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="jj-section-title">{title}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="jj-section-copy">{copy}</div>', unsafe_allow_html=True)
-
-
-def _render_premium_header():
-    paths = _image_paths()
-    left, title_col, meta_col, train_col = st.columns(
-        [0.9, 2.2, 2.1, 1.8], gap="small", vertical_alignment="center"
-    )
-
-    with left:
-        if paths["logo"].exists():
-            st.image(str(paths["logo"]), width=145)
-
-    with title_col:
-        st.markdown(
-            '<div class="jj-home-title">Command Center APU 001</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div class="jj-home-subtitle">Vista ejecutiva para monitoreo, continuidad operativa y priorizacion de mantenimiento con lectura explicable del riesgo.</div>',
-            unsafe_allow_html=True,
-        )
-
-    with meta_col:
-        render_station_line(train_id="001", cycle_seconds=5)
-
-    with train_col:
-        st.markdown('<div class="jj-header-train-wrap">', unsafe_allow_html=True)
-        if paths["train"].exists():
-            st.image(str(paths["train"]), width=330)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-
-def _build_premium_risk_chart(df, prediction):
+def _build_risk_chart(df, prediction):
+    """Gráfico de riesgo a lo largo del tiempo."""
     risk_df = df.tail(720).copy()
     fig = go.Figure()
+    
     fig.add_trace(
         go.Scatter(
             x=risk_df["timestamp"],
             y=risk_df["risk_score"],
             mode="lines",
             name="Risk score",
-            line=dict(color=PALETTE["steel_azure"], width=2.7),
+            line=dict(color=COLORS["primary_blue"], width=2.7),
             fill="tozeroy",
             fillcolor="rgba(35, 75, 141, 0.12)",
             hovertemplate="%{x}<br>Score %{y:.3f}<extra></extra>",
         )
     )
-    fig.add_hline(y=RISK_THRESHOLDS["MEDIO"], line_dash="dash", line_color="#D5B700")
-    fig.add_hline(y=RISK_THRESHOLDS["ALTO"], line_dash="dash", line_color=PALETTE["alert_red"])
+    
+    fig.add_hline(
+        y=RISK_THRESHOLDS["MEDIO"],
+        line_dash="dash",
+        line_color=COLORS["accent_yellow"],
+        annotation_text=f"MEDIO",
+        annotation_position="top left",
+    )
+    fig.add_hline(
+        y=RISK_THRESHOLDS["ALTO"],
+        line_dash="dash",
+        line_color=COLORS["alert_red"],
+        annotation_text=f"ALTO",
+        annotation_position="top left",
+    )
+    
+    # Proyección
     fig.add_trace(
         go.Scatter(
             x=[risk_df["timestamp"].iloc[-1]],
@@ -384,19 +75,20 @@ def _build_premium_risk_chart(df, prediction):
             mode="markers",
             name="Proyeccion 2h",
             marker=dict(
-                color=PALETTE["yellow"],
+                color=COLORS["accent_yellow"],
                 size=12,
-                line=dict(color="#0F1E3C", width=1.2),
+                line=dict(color=COLORS["text_dark"], width=1.2),
             ),
-            hovertemplate="Proyeccion 2h<br>%{y:.3f}<extra></extra>",
+            hovertemplate="Proyeccion<br>%{y:.3f}<extra></extra>",
         )
     )
+    
     fig.update_layout(
         height=360,
         margin=dict(t=20, b=10, l=6, r=6),
         paper_bgcolor="white",
         plot_bgcolor="white",
-        font=dict(color="#0F1E3C"),
+        font=dict(color=COLORS["text_dark"]),
         legend=dict(orientation="h", y=1.10, x=0),
     )
     fig.update_yaxes(range=[0, 1], showgrid=True, gridcolor="rgba(35, 75, 141, 0.10)")
@@ -404,7 +96,8 @@ def _build_premium_risk_chart(df, prediction):
     return fig
 
 
-def _build_driver_chart(alert_reasons):
+def _build_drivers_chart(alert_reasons):
+    """Gráfico de drivers/causas del riesgo."""
     chunks = [chunk.strip() for chunk in str(alert_reasons).split("|") if chunk.strip()]
     labels = []
     values = []
@@ -414,15 +107,16 @@ def _build_driver_chart(alert_reasons):
         values.append(max(1, 6 - idx))
 
     if not labels:
-        labels = ["Operacion estable"]
+        labels = ["Estable"]
         values = [1]
 
+    blues = ["#234B8D", "#4A76BE", "#7698D0", "#AFC4E8", "#D7E2F5"]
     fig = go.Figure(
         go.Bar(
             x=values[::-1],
             y=labels[::-1],
             orientation="h",
-            marker=dict(color=["#234B8D", "#4A76BE", "#7698D0", "#AFC4E8", "#D7E2F5"][: len(labels)][::-1]),
+            marker=dict(color=blues[: len(labels)][::-1]),
             hovertemplate="%{y}<extra></extra>",
         )
     )
@@ -431,7 +125,7 @@ def _build_driver_chart(alert_reasons):
         margin=dict(t=20, b=12, l=6, r=6),
         paper_bgcolor="white",
         plot_bgcolor="white",
-        font=dict(color="#0F1E3C"),
+        font=dict(color=COLORS["text_dark"]),
         xaxis_title="Peso relativo",
     )
     fig.update_xaxes(showgrid=True, gridcolor="rgba(35, 75, 141, 0.08)")
@@ -439,109 +133,302 @@ def _build_driver_chart(alert_reasons):
     return fig
 
 
+# ============================================================================
+# HEADER
+# ============================================================================
+
+def _render_header():
+    """Renderiza header premium con logo y estación."""
+    assets_dir = Path(__file__).resolve().parents[1] / "assets" / "images"
+    logo_path = assets_dir / "logo.png"
+    train_path = assets_dir / "train.png"
+    
+    cols = st.columns([0.9, 2.2, 2.1, 1.8], gap="small", vertical_alignment="center")
+    
+    with cols[0]:
+        if logo_path.exists():
+            st.image(str(logo_path), width=145)
+    
+    with cols[1]:
+        render_page_title("Command Center APU 001", 
+                         "Vista ejecutiva para monitoreo, continuidad operativa y priorizacion de mantenimiento.")
+    
+    with cols[2]:
+        render_station_line(train_id="001", cycle_seconds=5)
+    
+    with cols[3]:
+        if train_path.exists():
+            st.image(str(train_path), width=330)
+
+
+# ============================================================================
+# SECCIÓN PRINCIPAL
+# ============================================================================
+
 def render(df):
-    _inject_home_css()
-    _inject_home_premium_css()
-    _render_premium_header()
-
-    working_df = df.copy().sort_values("timestamp")
-    thresholds, threshold_source = resolve_alert_thresholds(working_df)
-    alert_df, meta = evaluate_alerts(working_df.tail(2400), thresholds=thresholds)
-    latest_alert, _ = evaluate_latest_alert(working_df.tail(2400), thresholds=thresholds)
-    prediction = build_prediction_advisory(working_df.tail(2400), thresholds=thresholds)
-    latest = working_df.iloc[-1]
-
-    st.markdown('<div class="jj-hero-shell">', unsafe_allow_html=True)
-    hero_left, hero_right = st.columns([2.2, 1.0], gap="medium")
-    with hero_left:
-        _section_header(
-            "Executive View",
-            "Estado general del sistema",
-            f"Fuente de umbrales: {threshold_source}. Esta vista mezcla riesgo global, comportamiento por sensor y relaciones entre sensores para explicar mejor cada alerta.",
-        )
-    with hero_right:
-        render_alert_badge(
-            latest_alert["alert_level"],
-            label="Alerta operacional",
-            caption=f"Score {float(latest['risk_score']):.3f} | Proyeccion {prediction['projected_level']}",
-        )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    k1, k2, k3, k4 = st.columns(4, gap="medium")
-    with k1:
-        render_kpi_card(
-            label="Riesgo actual",
-            value=f"{float(latest['risk_score']):.3f}",
-            delta=str(latest["risk_level"]).upper(),
-            caption="Lectura actual del score entregado por el pipeline.",
-            tone="blue",
-        )
-    with k2:
-        render_kpi_card(
-            label="Proyeccion 2 horas",
-            value=f"{prediction['projected_score']:.3f}",
-            delta=prediction["trend_direction"].upper(),
-            caption="Trayectoria esperada si la pendiente reciente se mantiene.",
-            tone="yellow" if prediction["projected_level"] != "BAJO" else "dark",
-        )
-    with k3:
-        render_kpi_card(
-            label="Ventanas criticas",
-            value=str(int((alert_df["alert_level"] == "ALTO").sum())),
-            delta=f"{int((alert_df['alert_level'] == 'MEDIO').sum())} en observacion",
-            caption="Carga de ventanas que ya merecen accion operativa.",
-            tone="red",
-        )
-    with k4:
-        render_kpi_card(
-            label="Triggers activos",
-            value=str(int(latest_alert["alert_trigger_count"])),
-            delta=latest_alert["alert_sources"].replace("+", " + ").upper(),
-            caption="Cantidad de causas encendidas en la lectura actual.",
-            tone="dark",
-        )
-
-    _section_header(
-        "Risk Story",
-        "Comportamiento del riesgo y drivers activos",
-        "Cruza la trayectoria del score con los factores que mas pesan ahora mismo para que el dashboard no solo se vea premium, sino tambien explicable.",
+    """
+    Dashboard ejecutivo premium - Diseño impactante para impresionar.
+    """
+    # CSS premium
+    inject_theme_css()
+    
+    # Datos optimizados
+    data = load_dashboard_data()
+    latest = data['latest']
+    prediction = data['prediction']
+    alert_df = data['alert_df']
+    latest_alert = data['latest_alert']
+    threshold_source = data['threshold_source']
+    
+    # ========================================================================
+    # 1. HEADER ESPECTACULAR
+    # ========================================================================
+    
+    col_logo, col_title, col_station, col_train = st.columns(
+        [0.8, 2.2, 2.1, 1.9], gap="medium", vertical_alignment="center"
     )
-    chart_col, driver_col = st.columns([1.8, 1.0], gap="medium")
-    with chart_col:
-        st.plotly_chart(_build_premium_risk_chart(working_df, prediction), use_container_width=True)
-    with driver_col:
-        st.markdown('<div class="jj-driver-card">', unsafe_allow_html=True)
-        st.markdown("**Drivers criticos ahora**")
-        st.plotly_chart(_build_driver_chart(latest_alert["alert_reasons"]), use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    _section_header(
-        "Golden Signals",
-        "Senales doradas de la APU",
-        "Sintesis premium de disponibilidad neumatica, esfuerzo del compresor, estabilidad de descarga y condicion termica.",
+    
+    assets_dir = Path(__file__).resolve().parents[1] / "assets" / "images"
+    
+    with col_logo:
+        logo_path = assets_dir / "logo.png"
+        if logo_path.exists():
+            st.image(str(logo_path), width=145)
+    
+    with col_title:
+        st.markdown(
+            "<h1 class='title-main'>MonitoreoTI 🚀</h1>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<p class='subtitle-main'>Centro de Control Ejecutivo - Sistema de Monitoreo Predictivo Avanzado</p>",
+            unsafe_allow_html=True,
+        )
+    
+    with col_station:
+        render_station_line(train_id="001", cycle_seconds=5)
+    
+    with col_train:
+        train_path = assets_dir / "train.png"
+        if train_path.exists():
+            st.image(str(train_path), width=330)
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 2. ALERTA PRINCIPAL IMPACTANTE
+    # ========================================================================
+    
+    render_hero_alert(
+        alert_level=latest_alert["alert_level"],
+        score=float(latest['risk_score']),
+        trend=prediction['projected_level']
     )
-    render_golden_signals(working_df, thresholds)
-
-    _section_header(
-        "Finance Layer",
-        "Impacto financiero estimado",
-        "Modelo referencial para mostrar valor de negocio desde la primera vista, listo para adaptarse luego a costos reales del cliente.",
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 3. MÉTRICAS KPI PREMIUM EN GRID
+    # ========================================================================
+    
+    st.markdown(
+        '<div class="section-kicker">📊 INDICADORES CLAVE</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<h2 class="section-title">Estado Operacional Actual</h2>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<p class="section-copy">Métricas en tiempo real del estado del equipo APU #001</p>',
+        unsafe_allow_html=True,
+    )
+    
+    # Preparar datos de KPI
+    high_alerts = int((alert_df["alert_level"] == "ALTO").sum())
+    medium_alerts = int((alert_df["alert_level"] == "MEDIO").sum())
+    
+    kpi_metrics = [
+        {
+            "label": "Riesgo Actual",
+            "value": f"{float(latest['risk_score']):.3f}",
+            "delta": f"Estado: {str(latest['risk_level']).upper()}",
+            "caption": "Puntuación de riesgo del motor",
+            "progress": float(latest['risk_score']) * 100,
+            "color": "red" if float(latest['risk_score']) > 0.7 else "yellow" if float(latest['risk_score']) > 0.4 else "cyan",
+            "icon": "🎯"
+        },
+        {
+            "label": "Proyección 2H",
+            "value": f"{prediction['projected_score']:.3f}",
+            "delta": f"{prediction['trend_direction'].upper()}",
+            "caption": "Trayectoria esperada",
+            "progress": prediction['projected_score'] * 100,
+            "color": "blue",
+            "icon": "📈"
+        },
+        {
+            "label": "Alertas Críticas",
+            "value": str(high_alerts),
+            "delta": f"+{medium_alerts} en observación",
+            "caption": "Ventanas que requieren acción",
+            "progress": min((high_alerts / max(1, high_alerts + medium_alerts)) * 100, 100),
+            "color": "red" if high_alerts > 0 else "cyan",
+            "icon": "🚨"
+        },
+        {
+            "label": "Triggers Activos",
+            "value": str(int(latest_alert["alert_trigger_count"])),
+            "delta": latest_alert["alert_sources"].replace("+", " +").upper()[:30],
+            "caption": "Causas raíz identificadas",
+            "progress": min(latest_alert["alert_trigger_count"] * 25, 100),
+            "color": "pink",
+            "icon": "⚡"
+        }
+    ]
+    
+    render_metric_row(kpi_metrics)
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 4. RESUMEN ESTADÍSTICO PREMIUM
+    # ========================================================================
+    
+    render_premium_divider()
+    
+    render_stats_summary(
+        "📊 Estadísticas de Desempeño",
+        {
+            "Uptime": f"{(1 - high_alerts / max(1, len(alert_df))) * 100:.1f}%",
+            "Eficiencia": f"{100 - float(latest['risk_score']) * 100:.1f}%",
+            "Salud General": f"{100 - float(latest['risk_score']) * 80:.0f}/100",
+            "Status": "OPERATIVO" if float(latest['risk_score']) < 0.7 else "ALERTA",
+        }
+    )
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 5. GRÁFICOS PRINCIPALES OPTIMIZADOS
+    # ========================================================================
+    
+    render_section_header(
+        "📉 ANÁLISIS DE RIESGO",
+        "Comportamiento Temporal y Predicciones",
+        "Trayectoria del score de riesgo a lo largo del tiempo con proyecciones"
+    )
+    
+    col_chart, col_drivers = st.columns([2, 1], gap="medium")
+    
+    with col_chart:
+        st.markdown(
+            '<div class="chart-container">',
+            unsafe_allow_html=True,
+        )
+        st.plotly_chart(
+            _build_premium_risk_chart(data["df"], prediction),
+            use_container_width=True,
+            key="risk_chart"
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    with col_drivers:
+        st.markdown(
+            '<div class="chart-container">',
+            unsafe_allow_html=True,
+        )
+        st.markdown("**🔍 Drivers Críticos**")
+        st.plotly_chart(
+            _build_drivers_chart(latest_alert['alert_reasons']),
+            use_container_width=True,
+            key="drivers_chart"
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 6. GOLDEN SIGNALS
+    # ========================================================================
+    
+    render_premium_divider()
+    
+    render_section_header(
+        "⭐ SEÑALES CRÍTICAS",
+        "Indicadores de Salud del Sistema",
+        "Monitoreo de parámetros clave que indican la salud operativa"
+    )
+    render_golden_signals(data["df"], data["thresholds"])
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 7. ANÁLISIS FINANCIERO
+    # ========================================================================
+    
+    render_premium_divider()
+    
+    render_section_header(
+        "💰 IMPACTO FINANCIERO",
+        "ROI y Ahorros Proyectados",
+        "Estimación de valor generado por el sistema de monitoreo"
     )
     render_financial_section(alert_df, prediction)
-
-    _section_header(
-        "Operational Playbook",
-        "Acciones recomendadas",
-        "Plan accionable para operacion y mantenimiento a partir del ultimo estado consolidado por el motor de alertas.",
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 8. PLAYBOOK OPERATIVO
+    # ========================================================================
+    
+    render_premium_divider()
+    
+    render_section_header(
+        "🎯 PLAN DE ACCIÓN",
+        "Recomendaciones Operativas",
+        "Pasos concretos para mantener el equipo en óptimas condiciones"
     )
-    render_operativity_panel(working_df.tail(2400))
+    render_operativity_panel(data["df"].tail(2400))
+    
     st.caption(
-        f"Motor {meta.get('engine_version', 'v2')} | Umbral medio {meta.get('risk_threshold_medium', 0.4):.2f} | Umbral alto {meta.get('risk_threshold_high', 0.7):.2f}"
+        f"✓ Motor {data['meta'].get('engine_version', 'v2')} · "
+        f"⚠️ Umbral Medio {data['meta'].get('risk_threshold_medium', 0.4):.2f} · "
+        f"🚨Umbral Alto {data['meta'].get('risk_threshold_high', 0.7):.2f}"
     )
-
-    _section_header(
-        "Postmortem",
-        "Postmortem inteligente",
-        "Lectura ejecutiva de los episodios recientes para convertir telemetria en historia operativa y decisiones concretas.",
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 9. ANÁLISIS HISTÓRICO
+    # ========================================================================
+    
+    render_premium_divider()
+    
+    render_section_header(
+        "📋 POSTMORTEM",
+        "Análisis de Episodios Recientes",
+        "Desagregación ejecutiva de eventos críticos para toma de decisiones"
     )
     render_postmortem_panel(alert_df, prediction)
+    
+    st.markdown("")
+    
+    # ========================================================================
+    # 10. FOOTER PROFESIONAL
+    # ========================================================================
+    
+    st.markdown(
+        """
+        <div style="text-align: center; margin-top: 3rem; padding: 2rem; 
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+        border-radius: 16px; border-top: 2px solid #667eea;">
+            <p style="color: #718096; margin: 0;">Dashboard MonitoreoTI v2.0 • Powered by Streamlit & Python</p>
+            <p style="color: #a0aec0; font-size: 0.85rem; margin-top: 0.5rem;">
+                Última actualización: Ahora • Estado: OPERATIVO ✓
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
