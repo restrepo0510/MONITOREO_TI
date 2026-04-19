@@ -327,7 +327,7 @@ def render(df):
             unsafe_allow_html=True,
         )
         st.plotly_chart(
-            _build_premium_risk_chart(data["df"], prediction),
+            _build_risk_chart(data["df"], prediction),
             use_container_width=True,
             key="risk_chart"
         )

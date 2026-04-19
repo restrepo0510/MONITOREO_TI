@@ -5,7 +5,21 @@ from datetime import timedelta
 import pandas as pd
 import streamlit as st
 
+from src.dashboard.components.financial_section import render_financial_section
 from src.dashboard.theme import RISK_THRESHOLDS
+from src.dashboard.utils.alert_engine import (
+    build_prediction_advisory,
+    evaluate_alerts,
+    evaluate_latest_alert,
+    resolve_alert_thresholds,
+)
+from src.dashboard.utils.recommendation_engine import get_latest_recommendations
+from src.dashboard.views.ui_kit import (
+    inject_operational_ui,
+    render_level_badge,
+    render_section_header,
+    render_view_header,
+)
 
 
 SENSOR_COLUMNS = [
@@ -118,10 +132,24 @@ def _reset_sandbox(base_df: pd.DataFrame) -> None:
     st.session_state["sandbox_active"] = False
 
 
+def _split_reasons(reason_text: str) -> list[str]:
+    if not reason_text:
+        return []
+    reasons = []
+    for part in str(reason_text).split("|"):
+        clean = part.strip()
+        if clean:
+            reasons.append(clean)
+    return reasons
+
+
 def render(base_df: pd.DataFrame) -> None:
-    st.title("Prueba Manual (Sandbox)")
-    st.markdown("---")
-    st.info("Modo temporal para demo: no escribe en base de datos ni modifica archivos.")
+    inject_operational_ui()
+    render_view_header(
+        "Simulación Manual de Escenarios",
+        "Prueba controlada sin afectar archivos ni base de datos. Ideal para validar respuestas del sistema.",
+    )
+    st.info("Modo de simulación seguro: no escribe en base de datos ni modifica archivos.")
 
     _ensure_sandbox(base_df)
     _init_inputs_from_reference(st.session_state["sandbox_df"])
@@ -135,13 +163,16 @@ def render(base_df: pd.DataFrame) -> None:
     )
     st.session_state["sandbox_active"] = enabled
 
+    current_level = _risk_level_from_score(_safe_float(st.session_state[INPUT_KEYS["risk_score"]], 0.20))
+    render_section_header("Estado Actual de Simulación", "Confirma si el dashboard está usando datos reales o simulados.")
+    render_level_badge(current_level, _safe_float(st.session_state[INPUT_KEYS["risk_score"]], 0.20))
+
     if enabled:
         st.success("Sandbox activado: el dashboard usa la tabla simulada.")
     else:
         st.warning("Sandbox desactivado: el dashboard usa datos reales.")
 
-    st.markdown("### Entrada Manual")
-    st.caption("Edita valores, luego pulsa 'Agregar entrada simulada' para acumular filas.")
+    render_section_header("Configuración de Entrada Manual", "Edita variables operativas y agrega nuevas filas simuladas.")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -154,7 +185,7 @@ def render(base_df: pd.DataFrame) -> None:
         )
     with col2:
         score = _safe_float(st.session_state[INPUT_KEYS["risk_score"]], 0.20)
-        st.markdown(f"**Nivel calculado:** {_risk_level_from_score(score)}")
+        st.markdown(f"**Nivel calculado del escenario:** {_risk_level_from_score(score)}")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -181,7 +212,7 @@ def render(base_df: pd.DataFrame) -> None:
             st.success("Entrada agregada al sandbox.")
             st.rerun()
     with a2:
-        if st.button("Quitar ultima simulada", use_container_width=True):
+        if st.button("Quitar última simulada", use_container_width=True):
             ok = _remove_last_simulated_row()
             if ok:
                 st.success("Ultima entrada simulada removida.")
@@ -198,6 +229,7 @@ def render(base_df: pd.DataFrame) -> None:
     simulated_df = sandbox_df.iloc[base_len:].copy() if len(sandbox_df) > base_len else pd.DataFrame(columns=sandbox_df.columns)
 
     st.markdown("---")
+    render_section_header("Métricas Clave de Simulación", "Resumen rápido del volumen de datos reales y simulados.")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.metric("Filas reales", len(base_df))
@@ -208,12 +240,75 @@ def render(base_df: pd.DataFrame) -> None:
     with c4:
         st.metric("Sandbox activo", "SI" if st.session_state.get("sandbox_active", False) else "NO")
 
-    st.subheader("Vista previa de nueva fila (sin guardar)")
+    render_section_header("Vista Previa del Escenario", "Fila que se agregaría con la configuración actual (sin guardar).")
     preview = _build_manual_row(sandbox_df)
     show_cols = ["timestamp", "risk_score", "risk_level"] + [c for c in SENSOR_COLUMNS if c in sandbox_df.columns]
     st.dataframe(pd.DataFrame([preview])[show_cols], use_container_width=True)
 
-    st.subheader("Tabla de entradas simuladas")
+    render_section_header(
+        "Comparación Antes vs Después",
+        "Impacto esperado del nuevo escenario sobre nivel de riesgo, causas activas y recomendación operativa.",
+    )
+    working_before = sandbox_df.copy().sort_values("timestamp")
+    working_after = pd.concat([working_before, pd.DataFrame([preview])], ignore_index=True).sort_values("timestamp")
+
+    thresholds_before, _ = resolve_alert_thresholds(working_before)
+    latest_before, _ = evaluate_latest_alert(working_before.tail(2400), thresholds=thresholds_before)
+
+    thresholds_after, _ = resolve_alert_thresholds(working_after)
+    latest_after, _ = evaluate_latest_alert(working_after.tail(2400), thresholds=thresholds_after)
+    pred_after = build_prediction_advisory(working_after.tail(2400), thresholds=thresholds_after)
+    rec_after = get_latest_recommendations(working_after.tail(2400))
+
+    before_level = str(latest_before.get("alert_level", "BAJO"))
+    after_level = str(latest_after.get("alert_level", "BAJO"))
+    before_score = float(working_before["risk_score"].iloc[-1]) if not working_before.empty else 0.0
+    after_score = float(working_after["risk_score"].iloc[-1]) if not working_after.empty else before_score
+
+    c1, c2 = st.columns(2, gap="medium")
+    with c1:
+        st.markdown("**Estado actual (antes)**")
+        render_level_badge(before_level, before_score)
+    with c2:
+        st.markdown("**Estado simulado (después)**")
+        render_level_badge(after_level, after_score)
+
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("Nivel de riesgo", f"{before_level} -> {after_level}")
+    with m2:
+        st.metric("Score de riesgo", f"{after_score:.3f}", f"{after_score - before_score:+.3f}")
+    with m3:
+        st.metric("Proyección 2h", pred_after["projected_level"], pred_after["trend_direction"].upper())
+
+    before_reasons = set(_split_reasons(str(latest_before.get("alert_reasons", ""))))
+    after_reasons = set(_split_reasons(str(latest_after.get("alert_reasons", ""))))
+    activated = sorted([r for r in after_reasons if r not in before_reasons])
+
+    d1, d2 = st.columns([1.1, 1.2], gap="medium")
+    with d1:
+        st.markdown("**Drivers activados por la simulación**")
+        if activated:
+            for item in activated[:8]:
+                st.markdown(f"- {item}")
+        else:
+            st.caption("No se activaron drivers nuevos respecto al estado anterior.")
+    with d2:
+        st.markdown("**Recomendación resultante**")
+        if rec_after["combined_actions"]:
+            top_action = rec_after["combined_actions"][0]
+            st.info(top_action.get("text", "Sin acción priorizada."))
+        else:
+            st.caption("No hay recomendaciones disponibles para el escenario actual.")
+
+    render_section_header(
+        "Impacto Financiero Simulado",
+        "Estimación financiera para el escenario resultante usando el mismo motor del dashboard operativo.",
+    )
+    alerts_after_df, _ = evaluate_alerts(working_after.tail(2400), thresholds=thresholds_after)
+    render_financial_section(alerts_after_df, pred_after)
+
+    render_section_header("Historial de Entradas Simuladas", "Registro de los escenarios agregados en esta sesión.")
     if simulated_df.empty:
         st.info("Aun no hay entradas simuladas. Usa 'Agregar entrada simulada'.")
     else:

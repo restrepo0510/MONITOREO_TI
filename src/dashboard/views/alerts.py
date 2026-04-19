@@ -7,41 +7,18 @@ from src.dashboard.components.alert_badge import render_alert_badge
 from src.dashboard.components.kpi_card import render_kpi_card
 from src.dashboard.components.postmortem_panel import build_alert_episodes
 from src.dashboard.theme import PALETTE
+from src.dashboard.views.ui_kit import (
+    inject_operational_ui,
+    render_level_badge,
+    render_section_header,
+    render_view_header,
+)
 from src.dashboard.utils.alert_engine import (
     build_prediction_advisory,
     evaluate_alerts,
     evaluate_latest_alert,
     resolve_alert_thresholds,
 )
-
-
-def _inject_alerts_css():
-    st.markdown(
-        """
-        <style>
-        .alerts-section-title {
-            font-size: 1.45rem;
-            font-weight: 700;
-            color: #234B8D;
-            margin-top: 1.5rem;
-            margin-bottom: 0.8rem;
-            border-bottom: 2px solid #234B8D;
-            padding-bottom: 0.3rem;
-        }
-        .alerts-page-title {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #234B8D;
-            margin-bottom: 0.3rem;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def _section_title(text):
-    st.markdown(f'<div class="alerts-section-title">{text}</div>', unsafe_allow_html=True)
 
 
 def _render_current_alert_banner(latest_row):
@@ -210,10 +187,13 @@ def _build_driver_distribution(alerts_df: pd.DataFrame):
 
 
 def render(df):
-    _inject_alerts_css()
+    inject_operational_ui()
     _inject_alerts_premium_css()
 
-    st.markdown('<div class="alerts-page-title">Panel de Alertas</div>', unsafe_allow_html=True)
+    render_view_header(
+        "Estado de Alertas del Sistema",
+        "Seguimiento de eventos críticos, episodios y proyección de riesgo en una sola vista.",
+    )
     working_df = df.copy().sort_values("timestamp")
     thresholds, threshold_source = resolve_alert_thresholds(working_df)
     alerts_df, meta = evaluate_alerts(working_df.tail(3600), thresholds=thresholds)
@@ -238,6 +218,8 @@ def render(df):
         )
         st.caption(prediction["message"])
     with hero_right:
+        latest_score = float(working_df["risk_score"].iloc[-1]) if "risk_score" in working_df.columns else None
+        render_level_badge(latest_alert["alert_level"], latest_score)
         render_alert_badge(
             latest_alert["alert_level"],
             label="Estado actual",
@@ -282,7 +264,10 @@ def render(df):
         st.info("Sin alertas historicas activas. Sistema operando en rango normal.")
         return
 
-    _section_title("Linea de tiempo y atribucion")
+    render_section_header(
+        "Riesgo Operacional y Causas",
+        "Línea temporal de alertas junto a las fuentes que están explicando el comportamiento actual.",
+    )
     line_col, source_col = st.columns([1.8, 1.0], gap="medium")
     with line_col:
         st.plotly_chart(_build_alert_timeline(alerts_df), use_container_width=True)
@@ -294,7 +279,10 @@ def render(df):
         st.plotly_chart(_build_driver_distribution(alerts_df[alerts_df["alert_level"] != "BAJO"]), use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    _section_title("Ultimas ventanas con alerta")
+    render_section_header(
+        "Eventos Recientes con Alerta",
+        "Detalle de ventanas recientes donde el sistema detectó condiciones de observación o criticidad.",
+    )
     alert_table = (
         alerts_df[alerts_df["alert_level"] != "BAJO"][
             [
@@ -313,7 +301,10 @@ def render(df):
     )
     st.dataframe(alert_table, use_container_width=True, height=360)
 
-    _section_title("Avisos de prediccion")
+    render_section_header(
+        "Proyección de Riesgo",
+        "Estimación del próximo nivel de riesgo si se mantiene la tendencia reciente.",
+    )
     pred1, pred2 = st.columns([1.1, 1.2], gap="medium")
     with pred1:
         render_alert_badge(
@@ -344,7 +335,10 @@ def render(df):
         st.plotly_chart(fig, use_container_width=True)
 
     if not episodes.empty:
-        _section_title("Resumen por episodios")
+        render_section_header(
+            "Resumen de Episodios",
+            "Agrupación de alertas consecutivas para simplificar análisis operativo.",
+        )
         episode_table = episodes[
             ["start", "end", "level", "max_score", "sources", "duration_min", "windows"]
         ].head(20)
