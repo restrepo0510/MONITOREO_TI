@@ -233,12 +233,12 @@ El dashboard estará disponible en: `http://localhost:8501`
 
 El dataset contiene **3 fallas catastróficas** con timestamps exactos:
 
-| Falla | Tipo | Fecha | Duración | Componente Afectado |
-|-------|------|-------|----------|---------------------|
-| **Falla 1** | Fuga de aire (clientes) | 28 Feb - 1 Mar 2022 | ~24h | Tubería de alimentación |
-| **Falla 2** | Fuga de aire (secador) | 23 Mar 2022 | ~3h | Válvula piloto neumática |
-| **Falla 3** | Fuga de aceite | 30 May - 2 Jun 2022 | ~72h | Motor del compresor |
-
+| Falla | Tipo | Fecha | Duración |
+|-------|------|-------|----------|
+| **Falla 1** | Fuga de aire Alto estrés| 18 Abril -  18 Abril 2020 | ~24h | 
+| **Falla 2** | Fuga de aire Mantenimiento de alto estrés |  29 May - 30 Mayo 2020 | ~6:30h |
+| **Falla 3** | Fuga de aire Mantenimiento de alto estrés | 5 Jun - 7 Jun 2020 | ~1:30h |
+| **Falla 4** | Fuga de aire Mantenimiento de alto estrés| 15 Jul - 15 Jul 2020 | ~4:30h | 
 ---
 
 ## 🎯 Resultados Esperados
@@ -451,7 +451,7 @@ Usamos **una rama por tarea**. El nombre debe decir qué se está haciendo.
    - hacemos merge a `main` (ideal: **Squash and merge**)
    - borramos la rama remota después del merge
 3) Después del merge, todos actualizan su `main`:
-```bash
+   
 git checkout main
 git pull origin main
 ---
@@ -478,7 +478,20 @@ git pull origin main
 - [Pandas Documentation](https://pandas.pydata.org/docs/)
 
 ---
+## ⚙️ Configuración del Sistema
 
+El sistema utiliza una configuración centralizada (`src/config.py`) que desacopla parámetros críticos de la lógica de negocio. Esto permite modificar comportamiento sin alterar módulos internos.
+
+### Parámetros principales
+
+- **Rutas**: Ubicación de datos crudos, datasets procesados y logs.
+- **Ventana temporal (`WINDOW_SIZE_SECONDS`)**: Tamaño de los bloques de tiempo utilizados para generar características a partir de los sensores.
+- **Horizonte de predicción (`PREDICTION_HORIZON_MINUTES`)**: Tiempo mínimo de anticipación con el que el modelo intenta predecir una falla (alineado con el objetivo de 2 horas definido).
+- **Umbrales de riesgo (`RISK_THRESHOLD_*`)**: Valores que determinan cuándo se genera una alerta de riesgo Medio o Alto.
+- **Configuración de monitoreo**: Parámetros del dashboard y trazabilidad del sistema.
+
+Esta estructura garantiza coherencia entre los objetivos definidos en el documento técnico y su implementación en código.
+---
 ## 📄 Licencia
 
 Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.

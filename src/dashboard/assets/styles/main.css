@@ -1,0 +1,65 @@
+:root {
+  --sunbeam-yellow: #FFE600;
+  --black: #000000;
+  --light-blue: #B8DBD9;
+  --ghost-white: #F4F4F9;
+  --steel-azure: #234B8D;
+  --alert-red: #D32F2F;
+}
+
+[data-testid="stAppViewContainer"] {
+  background: var(--ghost-white);
+}
+
+[data-testid="stAppViewContainer"] .main .block-container,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] .block-container,
+[data-testid="stMainBlockContainer"] {
+  padding-top: 0.05rem !important;
+  padding-bottom: 2.3rem !important;
+}
+
+[data-testid="stMainBlockContainer"] > div:first-child,
+[data-testid="stAppViewContainer"] .main .block-container > div:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+[data-testid="stHeader"] {
+  background: transparent;
+}
+
+[data-testid="stSidebar"] {
+  background: var(--steel-azure);
+  border-right: 1px solid rgba(244, 244, 249, 0.18);
+}
+
+[data-testid="stSidebar"] * {
+  color: var(--ghost-white);
+}
+
+h1, h2, h3 {
+  color: var(--black);
+  letter-spacing: 0.1px;
+}
+
+hr {
+  border-top: 1px solid rgba(35, 75, 141, 0.2);
+  margin-top: 1.1rem;
+  margin-bottom: 1.1rem;
+}
+
+.stButton > button {
+  border-radius: 10px;
+  border: 1px solid rgba(35, 75, 141, 0.35);
+}
+
+[data-testid="stPlotlyChart"] {
+  margin-top: 0.2rem;
+  margin-bottom: 0.8rem;
+}
+
+[data-testid="stSidebar"] .stButton > button {
+  background: var(--ghost-white);
+  color: var(--steel-azure);
+  border: none;
+}
