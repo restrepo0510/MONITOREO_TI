@@ -227,62 +227,112 @@ def render(df):
         )
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # ===== SECCIÓN MEJORADA: KPI CARDS =====
+    st.markdown("""
+    <div style="margin-top: 32px; margin-bottom: 28px;">
+        <h2 style="color: #0F1E3C; font-family: Arial; font-size: 26px; margin: 0 0 8px 0; font-weight: bold;">
+             Resumen de Alertas
+        </h2>
+        <p style="color: #6B7280; font-family: Arial; font-size: 13px; margin: 0;">
+            Ventanas de riesgo, episodios detectados y proyección temporal hacia escalamiento.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
     c1, c2, c3, c4 = st.columns(4, gap="medium")
+    
     with c1:
         render_kpi_card(
             label="Ventanas ALTO",
             value=str(len(alto)),
-            caption="Ventanas recientes con severidad alta segun el motor formal.",
+            delta=f"{len(alto)} ventanas críticas" if len(alto) > 0 else "Sin ventanas críticas",
+            caption="Ventanas recientes con severidad alta según el motor formal.",
             tone="red",
         )
+    
     with c2:
         render_kpi_card(
             label="Ventanas MEDIO",
             value=str(len(medio)),
-            caption="Ventanas en observacion antes de un posible escalamiento.",
+            delta=f"{len(medio)} en observación" if len(medio) > 0 else "Sin observaciones",
+            caption="Ventanas en observación antes de un posible escalamiento.",
             tone="yellow",
         )
+    
     with c3:
         render_kpi_card(
             label="Episodios",
             value=str(len(episodes)),
-            caption="Bloques contiguos de alertas para lectura operativa mas limpia.",
+            delta=f"{len(episodes)} bloques detectados" if len(episodes) > 0 else "Sin episodios",
+            caption="Bloques contiguos de alertas para lectura operativa más limpia.",
             tone="blue",
         )
+    
     with c4:
         minutes_to_high = prediction.get("minutes_to_high")
         eta_text = f"{minutes_to_high} min" if minutes_to_high is not None else "Sin cruce"
+        trend_direction = prediction["trend_direction"].upper()
         render_kpi_card(
             label="ETA a ALTO",
             value=eta_text,
-            delta=prediction["trend_direction"].upper(),
+            delta=trend_direction,
             caption="Tiempo estimado para alcanzar ALTO si la pendiente reciente se sostiene.",
             tone="dark",
         )
+
+    st.markdown("""
+    <div style="margin-top: 20px; padding: 14px 16px; background: #F0F9FF; border-left: 4px solid #0891B2; border-radius: 8px;">
+        <p style="color: #0F1E3C; font-family: Arial; font-size: 13px; margin: 0; font-weight: 500;">
+            <b>Lectura rápida</b>: {0} ventana(s) ALTO + {1} MEDIO + {2} episodio(s) = {3} evento(s) total
+        </p>
+    </div>
+    """.format(len(alto), len(medio), len(episodes), len(alto) + len(medio)), unsafe_allow_html=True)
 
     if alto.empty and medio.empty:
         st.info("Sin alertas historicas activas. Sistema operando en rango normal.")
         return
 
-    render_section_header(
-        "Riesgo Operacional y Causas",
-        "Línea temporal de alertas junto a las fuentes que están explicando el comportamiento actual.",
-    )
+    # ===== SECCIÓN MEJORADA: RIESGO OPERACIONAL Y CAUSAS =====
+    st.markdown("""
+    <div style="margin-top: 40px; margin-bottom: 28px;">
+        <h2 style="color: #0F1E3C; font-family: Arial; font-size: 26px; margin: 0 0 8px 0; font-weight: bold;">
+             Riesgo Operacional y Causas
+        </h2>
+        <p style="color: #6B7280; font-family: Arial; font-size: 13px; margin: 0;">
+            Línea temporal de alertas junto a las fuentes que están explicando el comportamiento actual.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     line_col, source_col = st.columns([1.8, 1.0], gap="medium")
+    
     with line_col:
+        st.markdown("<h4 style='color: #0F1E3C; font-family: Arial; font-size: 14px; margin: 0 0 12px 0; font-weight: bold;'>Línea Temporal de Riesgo</h4>", unsafe_allow_html=True)
         st.plotly_chart(_build_alert_timeline(alerts_df), use_container_width=True)
+    
     with source_col:
         st.markdown('<div class="jj-alert-panel">', unsafe_allow_html=True)
-        st.markdown("**Mix de fuentes**")
+        
+        st.markdown("<h4 style='color: #0F1E3C; font-family: Arial; font-size: 13px; margin: 0 0 12px 0; font-weight: bold;'>Mix de Fuentes</h4>", unsafe_allow_html=True)
         st.plotly_chart(_build_source_mix(alerts_df), use_container_width=True)
-        st.markdown("**Drivers mas repetidos**")
+        
+        st.markdown("<h4 style='color: #0F1E3C; font-family: Arial; font-size: 13px; margin: 16px 0 12px 0; font-weight: bold;'>Drivers Más Repetidos</h4>", unsafe_allow_html=True)
         st.plotly_chart(_build_driver_distribution(alerts_df[alerts_df["alert_level"] != "BAJO"]), use_container_width=True)
+        
         st.markdown("</div>", unsafe_allow_html=True)
 
-    render_section_header(
-        "Eventos Recientes con Alerta",
-        "Detalle de ventanas recientes donde el sistema detectó condiciones de observación o criticidad.",
-    )
+    # ===== SECCIÓN MEJORADA: EVENTOS RECIENTES CON ALERTA =====
+    st.markdown("""
+    <div style="margin-top: 40px; margin-bottom: 28px;">
+        <h2 style="color: #0F1E3C; font-family: Arial; font-size: 26px; margin: 0 0 8px 0; font-weight: bold;">
+             Eventos Recientes con Alerta
+        </h2>
+        <p style="color: #6B7280; font-family: Arial; font-size: 13px; margin: 0;">
+            Detalle de ventanas recientes donde el sistema detectó condiciones de observación o criticidad.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     alert_table = (
         alerts_df[alerts_df["alert_level"] != "BAJO"][
             [
@@ -301,10 +351,18 @@ def render(df):
     )
     st.dataframe(alert_table, use_container_width=True, height=360)
 
-    render_section_header(
-        "Proyección de Riesgo",
-        "Estimación del próximo nivel de riesgo si se mantiene la tendencia reciente.",
-    )
+    # ===== SECCIÓN MEJORADA: PROYECCIÓN DE RIESGO =====
+    st.markdown("""
+    <div style="margin-top: 40px; margin-bottom: 28px;">
+        <h2 style="color: #0F1E3C; font-family: Arial; font-size: 26px; margin: 0 0 8px 0; font-weight: bold;">
+             Proyección de Riesgo
+        </h2>
+        <p style="color: #6B7280; font-family: Arial; font-size: 13px; margin: 0;">
+            Estimación del próximo nivel de riesgo si se mantiene la tendencia reciente.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     pred1, pred2 = st.columns([1.1, 1.2], gap="medium")
     with pred1:
         render_alert_badge(
@@ -335,10 +393,18 @@ def render(df):
         st.plotly_chart(fig, use_container_width=True)
 
     if not episodes.empty:
-        render_section_header(
-            "Resumen de Episodios",
-            "Agrupación de alertas consecutivas para simplificar análisis operativo.",
-        )
+        # ===== SECCIÓN MEJORADA: RESUMEN DE EPISODIOS =====
+        st.markdown("""
+        <div style="margin-top: 40px; margin-bottom: 28px;">
+            <h2 style="color: #0F1E3C; font-family: Arial; font-size: 26px; margin: 0 0 8px 0; font-weight: bold;">
+                 Resumen de Episodios
+            </h2>
+            <p style="color: #6B7280; font-family: Arial; font-size: 13px; margin: 0;">
+                Agrupación de alertas consecutivas para simplificar análisis operativo.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         episode_table = episodes[
             ["start", "end", "level", "max_score", "sources", "duration_min", "windows"]
         ].head(20)

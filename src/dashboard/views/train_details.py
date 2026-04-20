@@ -33,12 +33,25 @@ def _correlation_heatmap(df_f: pd.DataFrame, sensors: list[str]):
     fig = px.imshow(
         corr,
         text_auto=".2f",
-        color_continuous_scale=["#173A73", "#F3F7FF", "#D5B700"],
+        color_continuous_scale=["#1E3A8A", "#E0E7FF", "#DC1F26"],
         zmin=-1,
         zmax=1,
         aspect="auto",
     )
-    fig.update_layout(height=350, margin=dict(t=10, b=10, l=10, r=10))
+    fig.update_layout(
+        height=420,
+        margin=dict(t=30, b=30, l=120, r=30),
+        paper_bgcolor="#FAFAFA",
+        plot_bgcolor="#FAFAFA",
+        title_text="Matriz de Correlación de Sensores",
+        title_font=dict(size=14, color="#1F2937", family="Arial Black"),
+        coloraxis_colorbar=dict(
+            title="Correlación",
+            thicknessmode="pixels", thickness=20,
+            lenmode="pixels", len=300,
+        ),
+        font=dict(family="Arial, sans-serif", size=11, color="#374151"),
+    )
     return fig
 
 
@@ -102,32 +115,66 @@ def render(df):
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=df_f["timestamp"], y=df_f["risk_score"],
-        mode="lines", name="Risk Score",
-        line=dict(color=PALETTE["steel_azure"], width=2),
-        fill="tozeroy", fillcolor="rgba(184,219,217,0.28)"
+        x=df_f["timestamp"], 
+        y=df_f["risk_score"],
+        mode="lines", 
+        name="Risk Score",
+        line=dict(color="#1E3A8A", width=3),
+        fill="tozeroy", 
+        fillcolor="rgba(30, 58, 138, 0.15)",
+        hovertemplate="<b>Tiempo:</b> %{x}<br><b>Risk Score:</b> %{y:.2%}<extra></extra>",
     ))
     fig.add_hline(
         y=RISK_THRESHOLDS["MEDIO"],
-        line_dash="dot",
-        line_color=PALETTE["yellow"],
-        annotation_text=f"Umbral MEDIO ({RISK_THRESHOLDS['MEDIO']:.1f})",
+        line_dash="dash",
+        line_color="#F59E0B",
+        line_width=2.2,
+        annotation_text=f"Umbral MEDIO: {RISK_THRESHOLDS['MEDIO']:.0%}",
+        annotation_position="right",
+        annotation_font=dict(size=11, color="#D97706", family="Arial Black"),
     )
     fig.add_hline(
         y=RISK_THRESHOLDS["ALTO"],
         line_dash="dot",
-        line_color=PALETTE["alert_red"],
-        annotation_text=f"Umbral ALTO ({RISK_THRESHOLDS['ALTO']:.1f})",
+        line_color="#DC1F26",
+        line_width=2.4,
+        annotation_text=f"Umbral ALTO: {RISK_THRESHOLDS['ALTO']:.0%}",
+        annotation_position="right",
+        annotation_font=dict(size=11, color="#7F1D1D", family="Arial Black"),
     )
     fig.update_layout(
         height=420,
+        margin=dict(t=30, b=30, l=20, r=150),
+        paper_bgcolor="#FAFAFA",
+        plot_bgcolor="#FAFAFA",
         xaxis_title="Timestamp",
-        yaxis_title="Risk Score",
-        yaxis=dict(range=[0, 1]),
-        margin=dict(t=20, b=20),
-        paper_bgcolor=PALETTE["ghost_white"],
-        plot_bgcolor="white",
-        font=dict(color=PALETTE["black"]),
+        yaxis_title="Risk Score (%)",
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=1,
+            linecolor="#E5E7EB",
+            tickfont=dict(size=10, color="#6B7280"),
+        ),
+        yaxis=dict(
+            range=[0, 1],
+            showgrid=True,
+            gridwidth=0.8,
+            gridcolor="rgba(209, 213, 219, 0.5)",
+            zeroline=False,
+            showline=True,
+            linewidth=1,
+            linecolor="#E5E7EB",
+            tickfont=dict(size=10, color="#6B7280"),
+            tickformat=".0%",
+        ),
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="Arial",
+        ),
+        font=dict(family="Arial, sans-serif", color="#374151"),
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -171,6 +218,49 @@ def render(df):
         if selected:
             compare_df = df_f[["timestamp"] + selected].copy().tail(720)
             long_df = compare_df.melt(id_vars=["timestamp"], var_name="Sensor", value_name="Valor")
-            fig_cmp = px.line(long_df, x="timestamp", y="Valor", color="Sensor")
-            fig_cmp.update_layout(height=330, margin=dict(t=10, b=10, l=10, r=10), paper_bgcolor="white", plot_bgcolor="white")
+            
+            color_palette = {
+                "TP3_mean": "#1E3A8A",
+                "H1_mean": "#0891B2",
+                "DV_pressure_mean": "#059669",
+                "Motor_Current_mean": "#DC1F26",
+                "MPG_last": "#F59E0B",
+                "Oil_Temperature_mean": "#8B5CF6",
+                "TOWERS_last": "#EC4899",
+            }
+            
+            fig_cmp = px.line(long_df, x="timestamp", y="Valor", color="Sensor", color_discrete_map=color_palette)
+            fig_cmp.update_traces(line=dict(width=2.5))
+            fig_cmp.update_layout(
+                height=400,
+                margin=dict(t=30, b=30, l=60, r=30),
+                paper_bgcolor="#FAFAFA",
+                plot_bgcolor="#FAFAFA",
+                xaxis=dict(
+                    showgrid=False,
+                    zeroline=False,
+                    showline=True,
+                    linewidth=1,
+                    linecolor="#E5E7EB",
+                    tickfont=dict(size=10, color="#6B7280"),
+                ),
+                yaxis=dict(
+                    showgrid=True,
+                    gridwidth=0.8,
+                    gridcolor="rgba(209, 213, 219, 0.5)",
+                    zeroline=False,
+                    showline=True,
+                    linewidth=1,
+                    linecolor="#E5E7EB",
+                    tickfont=dict(size=10, color="#6B7280"),
+                ),
+                hoverlabel=dict(bgcolor="white", font_size=12, font_family="Arial"),
+                legend=dict(
+                    bgcolor="rgba(255,255,255,0.8)",
+                    bordercolor="#E5E7EB",
+                    borderwidth=1,
+                    font=dict(size=11, family="Arial"),
+                ),
+                font=dict(family="Arial, sans-serif", color="#374151"),
+            )
             st.plotly_chart(fig_cmp, use_container_width=True)

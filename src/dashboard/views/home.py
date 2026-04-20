@@ -97,39 +97,99 @@ def _build_risk_chart(df, prediction):
 
 
 def _build_drivers_chart(alert_reasons):
-    """Gráfico de drivers/causas del riesgo."""
+    """Gráfico profesional de causas/drivers del riesgo."""
     chunks = [chunk.strip() for chunk in str(alert_reasons).split("|") if chunk.strip()]
     labels = []
     values = []
+    
     for idx, chunk in enumerate(chunks[:5], start=1):
         label = chunk.split(":", 1)[0].replace("_mean", "").replace("_last", "")
         labels.append(label)
         values.append(max(1, 6 - idx))
 
     if not labels:
-        labels = ["Estable"]
-        values = [1]
+        labels = ["Sistema Estable"]
+        values = [5]
+        colors_list = ["#059669"]  # Verde para estado estable
+    else:
+        # Paleta de colores gradiente: Rojo → Naranja → Amarillo
+        # Para mostrar severidad de cada causa
+        if len(labels) == 1:
+            colors_list = ["#DC1F26"]  # Rojo puro para una causa crítica
+        elif len(labels) == 2:
+            colors_list = ["#DC1F26", "#F97316"]  # Rojo, Naranja
+        elif len(labels) == 3:
+            colors_list = ["#DC1F26", "#F59E0B", "#F97316"]  # Rojo, Amarillo, Naranja
+        elif len(labels) == 4:
+            colors_list = ["#DC1F26", "#F59E0B", "#F97316", "#FB923C"]  # Rojo a Naranja
+        else:
+            colors_list = ["#DC1F26", "#F59E0B", "#F97316", "#FB923C", "#FBBF24"]  # Rojo a Amarillo
 
-    blues = ["#234B8D", "#4A76BE", "#7698D0", "#AFC4E8", "#D7E2F5"]
+    # Invertir para que la causa más importante esté arriba
+    labels = labels[::-1]
+    values = values[::-1]
+    colors_list = colors_list[::-1]
+
+    # Calcular porcentajes para las etiquetas
+    max_value = max(values) if values else 1
+    percentages = [int((v / max_value) * 100) for v in values]
+
+    # Crear figura con barras horizontales mejoradas
     fig = go.Figure(
         go.Bar(
-            x=values[::-1],
-            y=labels[::-1],
+            x=values,
+            y=labels,
             orientation="h",
-            marker=dict(color=blues[: len(labels)][::-1]),
-            hovertemplate="%{y}<extra></extra>",
+            marker=dict(
+                color=colors_list,
+                line=dict(
+                    color=[c.replace("F", "A") for c in colors_list],  # Bordes más oscuros
+                    width=2
+                ),
+                opacity=0.95
+            ),
+            text=[f"{pct}%" for pct in percentages],
+            textposition="outside",
+            textfont=dict(size=12, color="#0F1E3C", family="Arial Black"),
+            hovertemplate="<b>%{y}</b><br>Peso: %{x}<br>Severidad: %{customdata}%<extra></extra>",
+            customdata=percentages,
         )
     )
+    
+    # Actualizar layout con diseño profesional
     fig.update_layout(
-        height=360,
-        margin=dict(t=20, b=12, l=6, r=6),
-        paper_bgcolor="white",
+        height=320,
+        margin=dict(t=30, b=30, l=150, r=80),
+        paper_bgcolor="#FAFAFA",
         plot_bgcolor="white",
-        font=dict(color=COLORS["text_dark"]),
-        xaxis_title="Peso relativo",
+        font=dict(family="Arial", color="#0F1E3C", size=11),
+        xaxis_title="Peso Relativo",
+        xaxis_title_font=dict(size=12, family="Arial", color="#6B7280"),
+        showlegend=False,
+        hovermode="closest",
     )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(35, 75, 141, 0.08)")
-    fig.update_yaxes(showgrid=False)
+    
+    # Mejorar ejes
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor="rgba(200, 200, 200, 0.2)",
+        gridwidth=0.8,
+        showline=True,
+        linewidth=1,
+        linecolor="#E5E7EB",
+        zeroline=False,
+        tickfont=dict(size=11, color="#6B7280"),
+    )
+    
+    fig.update_yaxes(
+        showgrid=False,
+        showline=True,
+        linewidth=1,
+        linecolor="#E5E7EB",
+        tickfont=dict(size=11, color="#0F1E3C", family="Arial"),
+        automargin=True,
+    )
+    
     return fig
 
 
@@ -232,7 +292,7 @@ def render(df):
     # ========================================================================
     
     st.markdown(
-        '<div class="section-kicker">📊 INDICADORES CLAVE</div>',
+        '<div class="section-kicker">INDICADORES CLAVE</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -256,7 +316,7 @@ def render(df):
             "caption": "Puntuación de riesgo del motor",
             "progress": float(latest['risk_score']) * 100,
             "color": "red" if float(latest['risk_score']) > 0.7 else "yellow" if float(latest['risk_score']) > 0.4 else "cyan",
-            "icon": "🎯"
+            "icon": ""
         },
         {
             "label": "Proyección 2H",
@@ -265,7 +325,7 @@ def render(df):
             "caption": "Trayectoria esperada",
             "progress": prediction['projected_score'] * 100,
             "color": "blue",
-            "icon": "📈"
+            "icon": ""
         },
         {
             "label": "Alertas Críticas",
@@ -274,7 +334,7 @@ def render(df):
             "caption": "Ventanas que requieren acción",
             "progress": min((high_alerts / max(1, high_alerts + medium_alerts)) * 100, 100),
             "color": "red" if high_alerts > 0 else "cyan",
-            "icon": "🚨"
+            "icon": ""
         },
         {
             "label": "Triggers Activos",
@@ -283,7 +343,7 @@ def render(df):
             "caption": "Causas raíz identificadas",
             "progress": min(latest_alert["alert_trigger_count"] * 25, 100),
             "color": "pink",
-            "icon": "⚡"
+            "icon": ""
         }
     ]
     
@@ -298,7 +358,7 @@ def render(df):
     render_premium_divider()
     
     render_stats_summary(
-        "📊 Estadísticas de Desempeño",
+        "Estadísticas de Desempeño",
         {
             "Uptime": f"{(1 - high_alerts / max(1, len(alert_df))) * 100:.1f}%",
             "Eficiencia": f"{100 - float(latest['risk_score']) * 100:.1f}%",
@@ -314,7 +374,7 @@ def render(df):
     # ========================================================================
     
     render_section_header(
-        "📉 ANÁLISIS DE RIESGO",
+        "ANÁLISIS DE RIESGO",
         "Comportamiento Temporal y Predicciones",
         "Trayectoria del score de riesgo a lo largo del tiempo con proyecciones"
     )
@@ -370,7 +430,7 @@ def render(df):
     render_premium_divider()
     
     render_section_header(
-        "💰 IMPACTO FINANCIERO",
+        " IMPACTO FINANCIERO",
         "ROI y Ahorros Proyectados",
         "Estimación de valor generado por el sistema de monitoreo"
     )
@@ -385,16 +445,16 @@ def render(df):
     render_premium_divider()
     
     render_section_header(
-        "🎯 PLAN DE ACCIÓN",
+        "PLAN DE ACCIÓN",
         "Recomendaciones Operativas",
         "Pasos concretos para mantener el equipo en óptimas condiciones"
     )
     render_operativity_panel(data["df"].tail(2400))
     
     st.caption(
-        f"✓ Motor {data['meta'].get('engine_version', 'v2')} · "
-        f"⚠️ Umbral Medio {data['meta'].get('risk_threshold_medium', 0.4):.2f} · "
-        f"🚨Umbral Alto {data['meta'].get('risk_threshold_high', 0.7):.2f}"
+        f"Motor {data['meta'].get('engine_version', 'v2')} · "
+        f"Umbral Medio {data['meta'].get('risk_threshold_medium', 0.4):.2f} · "
+        f"Umbral Alto {data['meta'].get('risk_threshold_high', 0.7):.2f}"
     )
     
     st.markdown("")
@@ -406,7 +466,7 @@ def render(df):
     render_premium_divider()
     
     render_section_header(
-        "📋 POSTMORTEM",
+        "POSTMORTEM",
         "Análisis de Episodios Recientes",
         "Desagregación ejecutiva de eventos críticos para toma de decisiones"
     )

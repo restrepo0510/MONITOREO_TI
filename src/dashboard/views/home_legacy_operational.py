@@ -164,29 +164,96 @@ def _build_risk_chart(df):
 
 
 def _build_drivers_chart(alert_reasons):
+    """Gráfico profesional de causas/drivers del riesgo con colores degradados."""
     chunks = [chunk.strip() for chunk in str(alert_reasons).split("|") if chunk.strip()]
     labels = []
     values = []
+    
     for idx, chunk in enumerate(chunks[:5], start=1):
         label = chunk.split(":", 1)[0].replace("_mean", "").replace("_last", "")
         labels.append(label)
         values.append(max(1, 6 - idx))
-    if not labels:
-        labels = ["Estable"]
-        values = [1]
 
+    if not labels:
+        labels = ["Sistema Estable"]
+        values = [5]
+        colors_list = ["#059669"]  # Verde para estado estable
+    else:
+        # Paleta de colores degradada: Rojo → Naranja → Amarillo
+        if len(labels) == 1:
+            colors_list = ["#DC1F26"]  # Rojo puro
+        elif len(labels) == 2:
+            colors_list = ["#DC1F26", "#F97316"]  # Rojo, Naranja
+        elif len(labels) == 3:
+            colors_list = ["#DC1F26", "#F59E0B", "#F97316"]  # Rojo, Amarillo, Naranja
+        elif len(labels) == 4:
+            colors_list = ["#DC1F26", "#F59E0B", "#F97316", "#FB923C"]  # Rojo a Naranja
+        else:
+            colors_list = ["#DC1F26", "#F59E0B", "#F97316", "#FB923C", "#FBBF24"]  # Rojo a Amarillo
+
+    # Invertir para que la causa más importante esté arriba
+    labels = labels[::-1]
+    values = values[::-1]
+    colors_list = colors_list[::-1]
+
+    # Calcular porcentajes
+    max_value = max(values) if values else 1
+    percentages = [int((v / max_value) * 100) for v in values]
+
+    # Crear figura
     fig = go.Figure(
         go.Bar(
-            x=values[::-1],
-            y=labels[::-1],
+            x=values,
+            y=labels,
             orientation="h",
-            marker=dict(color=["#234B8D", "#4A76BE", "#7698D0", "#AFC4E8", "#D7E2F5"][: len(labels)][::-1]),
-            hovertemplate="%{y}<extra></extra>",
+            marker=dict(
+                color=colors_list,
+                line=dict(
+                    color=[c.replace("F", "A") for c in colors_list],
+                    width=2
+                ),
+                opacity=0.95
+            ),
+            text=[f"{pct}%" for pct in percentages],
+            textposition="outside",
+            textfont=dict(size=12, color="#0F1E3C", family="Arial Black"),
+            hovertemplate="<b>%{y}</b><br>Peso: %{x}<br>Severidad: %{customdata}%<extra></extra>",
+            customdata=percentages,
         )
     )
-    fig.update_layout(height=300, margin=dict(t=10, b=10, l=6, r=6), xaxis_title="Peso relativo")
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(35,75,141,0.08)")
-    fig.update_yaxes(showgrid=False)
+    
+    fig.update_layout(
+        height=340,
+        margin=dict(t=30, b=30, l=180, r=100),
+        paper_bgcolor="#FAFAFA",
+        plot_bgcolor="white",
+        font=dict(family="Arial", color="#0F1E3C", size=11),
+        xaxis_title="Peso Relativo",
+        xaxis_title_font=dict(size=12, family="Arial", color="#6B7280"),
+        showlegend=False,
+        hovermode="closest",
+    )
+    
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor="rgba(200, 200, 200, 0.2)",
+        gridwidth=0.8,
+        showline=True,
+        linewidth=1,
+        linecolor="#E5E7EB",
+        zeroline=False,
+        tickfont=dict(size=11, color="#6B7280"),
+    )
+    
+    fig.update_yaxes(
+        showgrid=False,
+        showline=True,
+        linewidth=1,
+        linecolor="#E5E7EB",
+        tickfont=dict(size=11, color="#0F1E3C", family="Arial"),
+        automargin=True,
+    )
+    
     return fig
 
 
