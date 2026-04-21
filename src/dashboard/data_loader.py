@@ -5,6 +5,7 @@ import streamlit as st
 from src.config import (
     DASHBOARD_SOURCE_OF_TRUTH_PATH,
     DATA_MODEL_OUTPUT_SQLITE_PATH,
+    AUTOENCODER_SCORES_PATH,
 )
 
 # ----------------------------------------------------------
@@ -86,4 +87,33 @@ def load_scores() -> pd.DataFrame:
             "risk_level": levels.astype(str)
         })
     df["timestamp"] = pd.to_datetime(df["timestamp"])
-    return _apply_dashboard_aliases(df)
+    df = _apply_dashboard_aliases(df)
+    df = _merge_autoencoder_scores(df)
+    return df
+
+
+@st.cache_data(ttl=60)
+def _load_ae_scores() -> pd.DataFrame | None:
+    if not os.path.exists(AUTOENCODER_SCORES_PATH):
+        return None
+    ae = pd.read_parquet(AUTOENCODER_SCORES_PATH)
+    ae["timestamp"] = pd.to_datetime(ae["timestamp"])
+    return ae
+
+
+def _merge_autoencoder_scores(df: pd.DataFrame) -> pd.DataFrame:
+    ae = _load_ae_scores()
+    if ae is None or ae.empty:
+        return df
+    # Merge por timestamp más cercano (tolerancia 5 min) para cubrir leves desajustes
+    df_sorted = df.sort_values("timestamp")
+    ae_sorted = ae.sort_values("timestamp")
+    merged = pd.merge_asof(
+        df_sorted,
+        ae_sorted,
+        on="timestamp",
+        tolerance=pd.Timedelta("5min"),
+        direction="nearest",
+        suffixes=("", "_ae"),
+    )
+    return merged

@@ -463,8 +463,26 @@ def evaluate_alerts(
                 context_row=context_row,
             )
 
+        # Evaluación del autoencoder como fuente adicional
+        model_ae_level = "BAJO"
+        model_ae_reasons: List[str] = []
+        ae_anomaly = row.get("ae_anomaly", False)
+        if ae_anomaly:
+            ae_score = _safe_float(row.get("ae_score"), default=0.0)
+            ae_error = _safe_float(row.get("ae_reconstruction_error"), default=0.0)
+            ae_top = str(row.get("ae_top_sensor", ""))
+            model_ae_level = "MEDIO"
+            desc = f"ae_error {ae_error:.6f}"
+            if ae_top:
+                desc += f" | sensor principal: {ae_top}"
+            model_ae_reasons.append(f"Autoencoder: anomalia detectada ({desc})")
+            # Si el ae_score es muy alto también promovemos a ALTO
+            if ae_score >= 0.7:
+                model_ae_level = "ALTO"
+
         final_level = _promote_level(risk_level, sensor_level)
         final_level = _promote_level(final_level, relation_level)
+        final_level = _promote_level(final_level, model_ae_level)
 
         sources = []
         if risk_reasons:
@@ -473,8 +491,10 @@ def evaluate_alerts(
             sources.append("sensores")
         if relation_reasons:
             sources.append("relaciones")
+        if model_ae_reasons:
+            sources.append("modelo")
 
-        reasons = risk_reasons + sensor_reasons + relation_reasons
+        reasons = risk_reasons + sensor_reasons + relation_reasons + model_ae_reasons
         if not reasons:
             reasons = ["Sin condiciones de alerta activas."]
 
@@ -482,7 +502,7 @@ def evaluate_alerts(
         alert_reasons.append(" | ".join(reasons))
         alert_sources.append("+".join(sources) if sources else "none")
         alert_trigger_count.append(
-            len(risk_reasons) + len(sensor_reasons) + len(relation_reasons)
+            len(risk_reasons) + len(sensor_reasons) + len(relation_reasons) + len(model_ae_reasons)
         )
 
     output["alert_level"] = alert_levels

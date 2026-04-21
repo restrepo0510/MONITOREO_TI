@@ -51,6 +51,16 @@ SENSOR_THRESHOLDS_PATH = "data/processed/sensor_thresholds.json"
 # Define acciones por nivel de alerta y por sensor.
 RECOMMENDATION_POLICY_PATH = "src/dashboard/config/recommended_actions.json"
 
+# =========================
+# AUTOENCODER
+# =========================
+
+# Directorio del modelo entrenado (artefactos Keras + scaler + threshold)
+AUTOENCODER_MODEL_DIR = "Models"
+
+# Scores del autoencoder agregados a ventanas de 5 min (se fusionan con risk_scores)
+AUTOENCODER_SCORES_PATH = "data/processed/autoencoder_scores.parquet"
+
 # Carpeta de logs
 LOG_DIR = "logs"
 

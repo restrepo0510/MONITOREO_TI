@@ -34,35 +34,7 @@ def _render_current_alert_banner(latest_row):
 
 
 def _inject_alerts_premium_css():
-    st.markdown(
-        """
-        <style>
-        .jj-alerts-hero {
-            background: radial-gradient(circle at top right, rgba(255,230,0,0.16), transparent 28%),
-                        linear-gradient(135deg, #FFFFFF 0%, #F6F9FF 52%, #EEF4FF 100%);
-            border-radius: 28px;
-            border: 1px solid rgba(35, 75, 141, 0.10);
-            box-shadow: 0 24px 48px rgba(15, 30, 60, 0.10);
-            padding: 1.2rem 1.25rem 1rem 1.25rem;
-            margin-bottom: 1rem;
-        }
-        .jj-alerts-copy {
-            color: #4E5C76;
-            font-size: 0.94rem;
-            line-height: 1.52;
-            margin-top: 0.25rem;
-        }
-        .jj-alert-panel {
-            background: #FFFFFF;
-            border-radius: 22px;
-            padding: 1rem;
-            border: 1px solid rgba(35, 75, 141, 0.10);
-            box-shadow: 0 18px 34px rgba(15, 30, 60, 0.08);
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    pass
 
 
 def _build_alert_timeline(alerts_df: pd.DataFrame):
@@ -208,14 +180,10 @@ def render(df):
     alto = alerts_df[alerts_df["alert_level"] == "ALTO"].copy()
     medio = alerts_df[alerts_df["alert_level"] == "MEDIO"].copy()
 
-    st.markdown('<div class="jj-alerts-hero">', unsafe_allow_html=True)
     hero_left, hero_right = st.columns([2.1, 1.0], gap="medium")
     with hero_left:
         st.markdown("### Monitoreo formal y prediccion")
-        st.markdown(
-            f'<div class="jj-alerts-copy">La vista de alertas ahora distingue tres capas: riesgo global, alertas atribuibles a sensores y reglas de relacion entre sensores. Fuente de umbrales: {threshold_source}.</div>',
-            unsafe_allow_html=True,
-        )
+        st.caption(f"La vista distingue cuatro capas: riesgo global, sensores, relaciones y modelo. Fuente de umbrales: {threshold_source}.")
         st.caption(prediction["message"])
     with hero_right:
         latest_score = float(working_df["risk_score"].iloc[-1]) if "risk_score" in working_df.columns else None
@@ -225,7 +193,6 @@ def render(df):
             label="Estado actual",
             caption=f"Triggers {latest_alert['alert_trigger_count']} | Proyeccion {prediction['projected_level']}",
         )
-    st.markdown("</div>", unsafe_allow_html=True)
 
     c1, c2, c3, c4 = st.columns(4, gap="medium")
     with c1:
@@ -272,12 +239,10 @@ def render(df):
     with line_col:
         st.plotly_chart(_build_alert_timeline(alerts_df), use_container_width=True)
     with source_col:
-        st.markdown('<div class="jj-alert-panel">', unsafe_allow_html=True)
         st.markdown("**Mix de fuentes**")
         st.plotly_chart(_build_source_mix(alerts_df), use_container_width=True)
         st.markdown("**Drivers mas repetidos**")
         st.plotly_chart(_build_driver_distribution(alerts_df[alerts_df["alert_level"] != "BAJO"]), use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
     render_section_header(
         "Eventos Recientes con Alerta",

@@ -71,6 +71,17 @@ def run_pipeline():
         print("No se pudo calibrar umbrales porque la predicción falló.\n")
 
     # ---------------------------------
+    # 3.7 INFERENCIA AUTOENCODER
+    # ---------------------------------
+    print("3.7 Corriendo inferencia del autoencoder...")
+    try:
+        from src.analysis.autoencoder_inference import run_autoencoder_inference
+        run_autoencoder_inference()
+        print("Inferencia del autoencoder completada\n")
+    except Exception as e:
+        print(f"Advertencia: inferencia del autoencoder falló ({e}). Continuando sin scores del modelo.\n")
+
+    # ---------------------------------
     # 4. GUARDAR RESULTADOS
     # ---------------------------------
 

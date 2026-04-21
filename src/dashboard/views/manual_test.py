@@ -22,6 +22,97 @@ from src.dashboard.views.ui_kit import (
 )
 
 
+_AE_COL_MAP = {
+    "TP3_mean": "TP3",
+    "H1_mean": "H1",
+    "DV_pressure_mean": "DV_pressure",
+    "Motor_Current_mean": "Motor_current",
+    "MPG_last": "MPG",
+    "Oil_Temperature_mean": "Oil_temperature",
+    "TOWERS_last": "Towers",
+}
+
+_AE_DEFAULTS = {
+    "TP2": 0.0, "Reservoirs": 0.0, "COMP": 0.0,
+    "DV_eletric": 0.0, "LPS": 0.0, "Oil_level": 0.0, "Caudal_impulses": 0.0,
+}
+
+_AE_FEATURE_ORDER = [
+    "TP2", "TP3", "H1", "DV_pressure", "Reservoirs",
+    "Oil_temperature", "Motor_current", "COMP", "DV_eletric",
+    "Towers", "MPG", "LPS", "Oil_level", "Caudal_impulses",
+]
+
+
+def _run_ae_on_inputs(inputs: dict) -> dict | None:
+    """Corre el autoencoder sobre los valores del sandbox y devuelve métricas."""
+    try:
+        import os
+        import numpy as np
+        os.environ.setdefault("KERAS_BACKEND", "torch")
+        import keras
+        from sklearn.preprocessing import StandardScaler
+        model_path = "Models/autoencoder_dense.keras"
+        threshold_path = "Models/threshold.npy"
+        base_path = "data/processed/base.parquet"
+
+        if not (os.path.exists(model_path) and os.path.exists(base_path)):
+            return None
+
+        model = keras.models.load_model(model_path)
+        threshold = float(np.load(threshold_path))
+
+        base_df = pd.read_parquet(base_path)
+        from src.analysis.autoencoder_inference import _prepare_features
+        X_all = _prepare_features(base_df, _AE_FEATURE_ORDER)
+        scaler = StandardScaler()
+        idx = np.random.default_rng(42).choice(len(X_all), min(200_000, len(X_all)), replace=False)
+        scaler.fit(X_all[idx])
+
+        row_vals: dict[str, float] = {}
+        for dashboard_col, ae_col in _AE_COL_MAP.items():
+            row_vals[ae_col] = float(inputs.get(INPUT_KEYS.get(dashboard_col, ""), 0.0))
+        for ae_col, default in _AE_DEFAULTS.items():
+            row_vals.setdefault(ae_col, default)
+
+        X_row = np.array([[row_vals[c] for c in _AE_FEATURE_ORDER]], dtype="float32")
+        X_scaled = scaler.transform(X_row).astype("float32")
+        X_rec = model.predict(X_scaled, verbose=0)
+
+        error_per_sensor = ((X_scaled - X_rec) ** 2)[0]
+        total_error = float(np.mean(error_per_sensor))
+        is_anomaly = total_error > threshold
+        top_idx = int(np.argmax(error_per_sensor))
+        top_sensor = _AE_FEATURE_ORDER[top_idx]
+
+        return {
+            "error": total_error,
+            "threshold": threshold,
+            "is_anomaly": is_anomaly,
+            "top_sensor": top_sensor,
+            "per_sensor": dict(zip(_AE_FEATURE_ORDER, error_per_sensor.tolist())),
+        }
+    except Exception:
+        return None
+
+
+def _render_ae_sandbox_prediction(inputs: dict) -> None:
+    result = _run_ae_on_inputs(inputs)
+    if result is None:
+        st.info("Autoencoder no disponible. Ejecuta el pipeline para activar esta funcionalidad.")
+        return
+
+    a1, a2, a3 = st.columns(3)
+    with a1:
+        status = "ANOMALIA" if result["is_anomaly"] else "NORMAL"
+        color = "red" if result["is_anomaly"] else "green"
+        st.markdown(f"**Estado del modelo:** :{color}[{status}]")
+    with a2:
+        st.metric("Error de reconstrucción", f"{result['error']:.6f}", f"Umbral {result['threshold']:.6f}")
+    with a3:
+        st.metric("Sensor más anómalo", result["top_sensor"])
+
+
 SENSOR_COLUMNS = [
     "TP3_mean",
     "H1_mean",
@@ -300,6 +391,12 @@ def render(base_df: pd.DataFrame) -> None:
             st.info(top_action.get("text", "Sin acción priorizada."))
         else:
             st.caption("No hay recomendaciones disponibles para el escenario actual.")
+
+    render_section_header(
+        "Predicción del Autoencoder",
+        "Estimación del modelo de detección de anomalías para los valores ingresados.",
+    )
+    _render_ae_sandbox_prediction(st.session_state)
 
     render_section_header(
         "Impacto Financiero Simulado",

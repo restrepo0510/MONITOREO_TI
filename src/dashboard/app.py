@@ -14,6 +14,7 @@ from src.dashboard.views import (
     home_legacy_operational,
     home_general,
     manual_test,
+    model_view,
     premium_full_latest,
     train_details,
 )
@@ -55,6 +56,7 @@ NAV_SECTIONS = {
         "items": [
             ("premium_full_latest", "Resumen Ejecutivo"),
             ("detail", "Detalle de Señales"),
+            ("model_view", "Modelo Predictivo"),
         ],
     },
 }
@@ -133,6 +135,8 @@ try:
         alerts.render(df)
     elif view_key == "sandbox":
         manual_test.render(real_df)
+    elif view_key == "model_view":
+        model_view.render(df)
 
 except Exception as e:
     st.error(f"❌ Error cargando dashboard: {str(e)}")
