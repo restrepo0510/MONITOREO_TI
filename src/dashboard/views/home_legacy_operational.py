@@ -1,4 +1,5 @@
 from pathlib import Path
+import html
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -11,9 +12,8 @@ from src.dashboard.components.sensor_chart import ensure_sensor_chart_styles, re
 from src.dashboard.components.station_line import render_station_line
 from src.dashboard.theme import PALETTE, RISK_THRESHOLDS
 from src.dashboard.views.ui_kit import (
-    render_level_badge,
+    inject_operational_ui,
     render_section_header,
-    render_view_header,
 )
 from src.dashboard.utils.alert_engine import (
     build_prediction_advisory,
@@ -23,6 +23,15 @@ from src.dashboard.utils.alert_engine import (
 )
 
 TRAIN_ID_CANDIDATES = ["train_id", "train", "id_train", "apu_id", "engine_id"]
+SENSOR_REASON_KEYS = {
+    "TP3_mean",
+    "H1_mean",
+    "DV_pressure_mean",
+    "Motor_Current_mean",
+    "MPG_last",
+    "Oil_Temperature_mean",
+    "TOWERS_last",
+}
 
 
 def _image_paths():
@@ -55,6 +64,23 @@ def _inject_css():
             border-radius: 12px;
             padding: 0.75rem 1rem;
             margin: 0.25rem 0 0.5rem 0;
+        }
+        /* Compactar metricas en vista tren */
+        div[data-testid="stMetric"] {
+            border-radius: 10px !important;
+            padding: 0.18rem 0.42rem !important;
+        }
+        div[data-testid="stMetricLabel"] p {
+            font-size: 0.78rem !important;
+            line-height: 1.1 !important;
+        }
+        div[data-testid="stMetricValue"] {
+            font-size: 1.45rem !important;
+            line-height: 1.05 !important;
+        }
+        div[data-testid="stMetricDelta"] {
+            font-size: 0.78rem !important;
+            line-height: 1.1 !important;
         }
         </style>
         """,
@@ -110,11 +136,12 @@ def _render_header(train_id: str):
 
 def _build_risk_chart(df):
     risk_df = df.tail(500).copy()
+    score_col = "risk_score_operational" if "risk_score_operational" in risk_df.columns else "risk_score"
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
             x=risk_df["timestamp"],
-            y=risk_df["risk_score"],
+            y=risk_df[score_col],
             mode="lines",
             name="Risk Score",
             line=dict(color=PALETTE["steel_azure"], width=2.5),
@@ -124,12 +151,12 @@ def _build_risk_chart(df):
         )
     )
 
-    high_events = risk_df[risk_df["risk_score"] >= RISK_THRESHOLDS["ALTO"]]
+    high_events = risk_df[risk_df[score_col] >= RISK_THRESHOLDS["ALTO"]]
     if not high_events.empty:
         fig.add_trace(
             go.Scatter(
                 x=high_events["timestamp"],
-                y=high_events["risk_score"],
+                y=high_events[score_col],
                 mode="markers",
                 name="Eventos ALTO",
                 marker=dict(color=PALETTE["alert_red"], size=7, symbol="diamond"),
@@ -274,40 +301,159 @@ def _render_risk_banner(risk_level, score):
         st.info(f"RIESGO BAJO - Score: {float(score):.2f}")
 
 
+def _extract_triggered_sensors(alert_reasons: str) -> list[str]:
+    sensors = []
+    for chunk in str(alert_reasons).split("|"):
+        part = chunk.strip()
+        if ":" not in part:
+            continue
+        prefix = part.split(":", 1)[0].strip()
+        if prefix in SENSOR_REASON_KEYS and prefix not in sensors:
+            sensors.append(prefix)
+    return sensors
+
+
+def _render_sensor_popup_red(latest_alert: dict, score_operational: float) -> None:
+    sensors = _extract_triggered_sensors(str(latest_alert.get("alert_reasons", "")))
+    if not sensors:
+        return
+
+    level = str(latest_alert.get("alert_level", "MEDIO")).upper()
+    triggers = int(latest_alert.get("alert_trigger_count", 0))
+    ts = latest_alert.get("timestamp")
+    time_text = str(ts)[:19] if ts is not None else "-"
+    sensor_text = ", ".join([s.replace("_mean", "").replace("_last", "") for s in sensors[:3]])
+    if len(sensors) > 3:
+        sensor_text += f" +{len(sensors) - 3}"
+    popup_id = f"sensor-popup-close-{abs(hash((level, time_text, sensor_text, triggers)))}"
+    safe_sensor_text = html.escape(sensor_text)
+    safe_time_text = html.escape(time_text)
+
+    st.markdown(
+        f"""
+        <style>
+        .sensor-popup-toggle {{
+          display: none;
+        }}
+        .sensor-popup-overlay {{
+          position: fixed;
+          inset: 0;
+          z-index: 99990;
+          background: rgba(10, 20, 40, 0.42);
+        }}
+        .sensor-popup-card {{
+          position: fixed;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          z-index: 99991;
+          width: min(560px, 92vw);
+          background: linear-gradient(180deg, #D32F2F 0%, #B71C1C 100%);
+          color: #FFF5F5;
+          border: 1px solid #F5B4B4;
+          border-radius: 14px;
+          box-shadow: 0 18px 40px rgba(120, 16, 22, 0.50);
+          padding: 1rem 1.05rem 0.95rem 1.05rem;
+        }}
+        .sensor-popup-title {{
+          font-weight: 900;
+          font-size: 1.00rem;
+          letter-spacing: 0.02em;
+          margin-bottom: 0.35rem;
+          padding-right: 1.5rem;
+        }}
+        .sensor-popup-copy {{
+          font-size: 0.88rem;
+          line-height: 1.35;
+          opacity: 0.98;
+        }}
+        .sensor-popup-close {{
+          position: absolute;
+          top: 0.42rem;
+          right: 0.62rem;
+          width: 1.35rem;
+          height: 1.35rem;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 255, 255, 0.72);
+          background: rgba(255, 255, 255, 0.14);
+          color: #FFFFFF;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 900;
+          font-size: 0.95rem;
+          line-height: 1;
+          cursor: pointer;
+          user-select: none;
+        }}
+        .sensor-popup-toggle:checked ~ .sensor-popup-overlay,
+        .sensor-popup-toggle:checked ~ .sensor-popup-card {{
+          display: none;
+        }}
+        </style>
+        <div class="sensor-popup-wrap">
+          <input id="{popup_id}" type="checkbox" class="sensor-popup-toggle" />
+          <div class="sensor-popup-overlay"></div>
+          <div class="sensor-popup-card">
+            <label class="sensor-popup-close" for="{popup_id}">×</label>
+            <div class="sensor-popup-title">ALERTA SENSOR ACTIVA ({level})</div>
+            <div class="sensor-popup-copy">
+              Sensores disparados: {safe_sensor_text}<br>
+              Score operativo: {score_operational:.3f} | Triggers: {triggers}<br>
+              Hora del evento: {safe_time_text}
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render(df):
     _inject_css()
+    inject_operational_ui()
     working_df = df.copy().sort_values("timestamp")
     train_df, train_id, train_col = _selected_train_df(working_df)
     _render_header(train_id)
-    render_view_header(
-        "Vista Tren (Operativa)",
-        "Monitoreo detallado del tren seleccionado: estado actual, señales clave, riesgo, finanzas y acciones.",
-    )
-
     latest = train_df.iloc[-1]
     risk_level = str(latest["risk_level"]).upper()
     score = float(latest["risk_score"])
     thresholds, _ = resolve_alert_thresholds(train_df)
     alert_df, _meta = evaluate_alerts(train_df.tail(2400), thresholds=thresholds)
     latest_alert, _ = evaluate_latest_alert(train_df.tail(2400), thresholds=thresholds)
-    prediction = build_prediction_advisory(train_df.tail(2400), thresholds=thresholds)
+    prediction = build_prediction_advisory(alert_df.tail(2400), thresholds=thresholds)
+    score_operational = float(latest_alert.get("risk_score_operational", score))
+    score_delta = float(latest_alert.get("risk_score_delta", score_operational - score))
+    risk_level_display = str(latest_alert.get("alert_level", risk_level)).upper()
+    _render_sensor_popup_red(latest_alert, score_operational)
+    trend_direction_display = prediction["trend_direction"].upper()
+    trend_detail = f"Triggers {int(latest_alert['alert_trigger_count'])}"
+    if trend_direction_display == "ESTABLE" and risk_level_display == "ALTO":
+        trend_direction_display = "ALTO SOSTENIDO"
+        trend_detail = f"Triggers {int(latest_alert['alert_trigger_count'])} | Score {score_operational:.3f}"
+    elif trend_direction_display == "ESTABLE" and score_delta >= 0.03:
+        trend_direction_display = "SUBIENDO"
+        trend_detail = f"Ajuste sensores {score_delta:+.3f}"
 
-    render_section_header("Estado Actual del Tren", "Lectura instantánea del nivel de riesgo operacional.")
-    _render_risk_banner(risk_level, score)
-    render_level_badge(risk_level, score)
+    render_section_header("Estado Actual", "")
+    _render_risk_banner(risk_level_display, score_operational)
+    if score_delta >= 0.03:
+        st.warning(
+            f"AVISO OPERATIVO: el riesgo general subio de {score:.3f} a {score_operational:.3f} por severidad detectada en sensores/relaciones."
+        )
     m1, m2, m3 = st.columns(3)
     with m1:
-        st.metric("Score de Riesgo Actual", f"{score:.3f}")
+        st.metric("Score de Riesgo Actual", f"{score_operational:.3f}", f"Ajuste {score_delta:+.3f}")
     with m2:
         st.metric("Proyección a 2 horas", f"{float(prediction['projected_score']):.3f}", prediction["projected_level"])
     with m3:
-        st.metric("Tendencia del Riesgo", prediction["trend_direction"].upper(), f"Triggers {int(latest_alert['alert_trigger_count'])}")
+        st.metric("Tendencia del Riesgo", trend_direction_display, trend_detail)
 
-    render_section_header("Riesgo Operacional en el Tiempo", "Evolución temporal del riesgo con umbrales de decisión.")
-    st.plotly_chart(_build_risk_chart(train_df), use_container_width=True)
+    render_section_header("Riesgo Operacional en el Tiempo", "")
+    st.plotly_chart(_build_risk_chart(alert_df), use_container_width=True)
 
     st.markdown("---")
-    render_section_header("Sensores Clave del Tren", "Comportamiento de las señales críticas para diagnóstico operativo.")
+    render_section_header("Sensores Clave del Tren", "")
     ensure_sensor_chart_styles()
 
     row1 = st.columns(4)
@@ -329,19 +475,14 @@ def render(df):
         render_sensor_card("TOWERS_last", train_df)
 
     st.markdown("---")
-    render_section_header("Señales Doradas del Tren", "Indicadores agregados que resumen la salud operativa del equipo.")
+    render_section_header("Señales Doradas del Tren", "")
     render_golden_signals(train_df, thresholds)
 
     st.markdown("---")
-    render_section_header("Impacto Financiero del Tren", "Estimación de costo evitado y valor de actuar preventivamente.")
     render_financial_section(alert_df, prediction)
 
     st.markdown("---")
-    render_section_header("Causas Actuales del Riesgo", "Factores que están empujando el riesgo en la lectura actual.")
-    st.plotly_chart(_build_drivers_chart(latest_alert["alert_reasons"]), use_container_width=True)
-
-    st.markdown("---")
-    render_section_header("Plan de Acción Recomendado", "Acciones operativas sugeridas según el estado del tren.")
+    render_section_header("Plan de Acción Recomendado", "")
     render_operativity_panel(train_df)
 
     st.markdown("---")

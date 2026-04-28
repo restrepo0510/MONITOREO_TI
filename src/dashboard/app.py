@@ -59,6 +59,46 @@ NAV_SECTIONS = {
     },
 }
 
+TRAIN_ID_CANDIDATES = ["train_id", "train", "id_train", "apu_id", "engine_id"]
+
+
+def _find_train_col(df):
+    for c in TRAIN_ID_CANDIDATES:
+        if c in df.columns:
+            return c
+    return None
+
+
+def _force_single_train(df):
+    """
+    Modo temporal: forzar que TODAS las vistas trabajen con un solo tren.
+    Usa selected_train_id si existe; si no, toma el primer tren disponible.
+    """
+    if df is None or df.empty:
+        st.session_state["selected_train_id"] = "001"
+        return df
+
+    train_col = _find_train_col(df)
+    if not train_col:
+        work = df.copy()
+        work["train_id"] = "001"
+        st.session_state["selected_train_id"] = "001"
+        return work
+
+    work = df.copy()
+    work[train_col] = work[train_col].astype(str)
+    candidates = work[train_col].dropna().astype(str).unique().tolist()
+    selected = str(st.session_state.get("selected_train_id", "")).strip()
+
+    if not selected or selected not in candidates:
+        selected = str(candidates[0]) if candidates else "001"
+    st.session_state["selected_train_id"] = selected
+
+    filtered = work[work[train_col] == selected].copy()
+    if filtered.empty:
+        return work
+    return filtered
+
 
 def _set_nav(view_key: str) -> None:
     st.session_state["nav_view"] = view_key
@@ -116,6 +156,10 @@ try:
         df = st.session_state["sandbox_df"].copy()
     else:
         df = real_df
+
+    # Modo temporal solicitado por usuario: operar TODO el dashboard sobre un solo tren.
+    df = _force_single_train(df)
+    real_df = _force_single_train(real_df)
     
     # ========================================================================
     # RENDERIZADO DE VISTAS

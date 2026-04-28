@@ -60,9 +60,12 @@ def _safe_float(value, fallback=0.0) -> float:
 
 
 def _next_timestamp(df: pd.DataFrame) -> pd.Timestamp:
+    now_ts = pd.Timestamp.now().floor("s")
     if "timestamp" in df.columns and not df.empty:
-        return pd.to_datetime(df["timestamp"].iloc[-1]) + timedelta(minutes=5)
-    return pd.Timestamp.now()
+        last_ts = pd.to_datetime(df["timestamp"].iloc[-1], errors="coerce")
+        if pd.notna(last_ts) and now_ts <= last_ts:
+            return last_ts + timedelta(seconds=1)
+    return now_ts
 
 
 def _ensure_sandbox(base_df: pd.DataFrame) -> None:
@@ -93,8 +96,55 @@ def _init_inputs_from_reference(ref_df: pd.DataFrame) -> None:
             st.session_state[key] = defaults[field]
 
 
+def _apply_quick_critical_scenario(ref_df: pd.DataFrame) -> None:
+    """
+    Precarga un escenario que suele activar severidad por sensores/relaciones
+    aun con risk_score base moderado.
+    """
+    latest = ref_df.iloc[-1] if not ref_df.empty else pd.Series(dtype="object")
+
+    tp3 = _safe_float(latest.get("TP3_mean", 9.0), 9.0)
+    h1 = _safe_float(latest.get("H1_mean", 9.0), 9.0)
+    dv = _safe_float(latest.get("DV_pressure_mean", 0.3), 0.3)
+    motor = _safe_float(latest.get("Motor_Current_mean", 0.3), 0.3)
+    oil = _safe_float(latest.get("Oil_Temperature_mean", 60.0), 60.0)
+
+    st.session_state[INPUT_KEYS["risk_score"]] = 0.25
+    st.session_state[INPUT_KEYS["TP3_mean"]] = max(0.2, tp3 * 0.45)
+    st.session_state[INPUT_KEYS["H1_mean"]] = max(0.2, h1 * 0.45)
+    st.session_state[INPUT_KEYS["DV_pressure_mean"]] = max(1.2, dv + abs(dv) * 2.2 + 0.8)
+    st.session_state[INPUT_KEYS["Motor_Current_mean"]] = max(1.5, motor * 3.4 + 0.9)
+    st.session_state[INPUT_KEYS["MPG_last"]] = 1.0
+    st.session_state[INPUT_KEYS["Oil_Temperature_mean"]] = max(95.0, oil + 28.0)
+    st.session_state[INPUT_KEYS["TOWERS_last"]] = 0.0
+    st.session_state["sandbox_template_applied"] = "critical"
+
+
+def _build_sandbox_event_note(previous_row: pd.Series, current_row: pd.Series) -> str:
+    deltas = []
+    for sensor in SENSOR_COLUMNS:
+        if sensor not in current_row.index:
+            continue
+        new_val = _safe_float(current_row.get(sensor), 0.0)
+        old_val = _safe_float(previous_row.get(sensor), 0.0) if sensor in previous_row.index else 0.0
+        delta = new_val - old_val
+        deltas.append((abs(delta), sensor, new_val, delta))
+
+    deltas.sort(key=lambda x: x[0], reverse=True)
+    top = deltas[:2]
+    if not top:
+        return "Prueba manual sandbox sin cambios relevantes de sensores."
+
+    parts = []
+    for _, sensor, value, delta in top:
+        sensor_name = sensor.replace("_mean", "").replace("_last", "")
+        parts.append(f"{sensor_name}={value:.3f} ({delta:+.3f})")
+    return f"Prueba manual sandbox con ajuste de sensores: {', '.join(parts)}."
+
+
 def _build_manual_row(sandbox_df: pd.DataFrame) -> pd.Series:
     latest = sandbox_df.iloc[-1].copy() if not sandbox_df.empty else pd.Series(dtype="object")
+    previous_snapshot = latest.copy()
 
     score = _safe_float(st.session_state[INPUT_KEYS["risk_score"]], 0.20)
     latest["timestamp"] = _next_timestamp(sandbox_df)
@@ -103,6 +153,9 @@ def _build_manual_row(sandbox_df: pd.DataFrame) -> pd.Series:
 
     for sensor in SENSOR_COLUMNS:
         latest[sensor] = _safe_float(st.session_state[INPUT_KEYS[sensor]], 0.0)
+
+    latest["sandbox_event_created_at"] = pd.Timestamp.now().floor("s")
+    latest["sandbox_event_note"] = _build_sandbox_event_note(previous_snapshot, latest)
 
     return latest
 
@@ -130,6 +183,7 @@ def _reset_sandbox(base_df: pd.DataFrame) -> None:
     st.session_state["sandbox_df"] = base_df.copy()
     st.session_state["sandbox_base_len"] = int(len(base_df))
     st.session_state["sandbox_active"] = False
+    st.session_state.pop("sandbox_template_applied", None)
 
 
 def _split_reasons(reason_text: str) -> list[str]:
@@ -174,6 +228,15 @@ def render(base_df: pd.DataFrame) -> None:
 
     render_section_header("Configuración de Entrada Manual", "Edita variables operativas y agrega nuevas filas simuladas.")
 
+    t1, t2 = st.columns([1.2, 2.2])
+    with t1:
+        if st.button("Escenario crítico rápido", use_container_width=True):
+            _apply_quick_critical_scenario(sandbox_df)
+            st.rerun()
+    with t2:
+        if st.session_state.get("sandbox_template_applied") == "critical":
+            st.success("Plantilla aplicada: sensores críticos precargados para probar acople al riesgo general.")
+
     col1, col2 = st.columns(2)
     with col1:
         st.slider(
@@ -186,6 +249,7 @@ def render(base_df: pd.DataFrame) -> None:
     with col2:
         score = _safe_float(st.session_state[INPUT_KEYS["risk_score"]], 0.20)
         st.markdown(f"**Nivel calculado del escenario:** {_risk_level_from_score(score)}")
+        st.caption("El motor puede elevar el riesgo general automaticamente si detecta anomalias severas en sensores.")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -262,8 +326,10 @@ def render(base_df: pd.DataFrame) -> None:
 
     before_level = str(latest_before.get("alert_level", "BAJO"))
     after_level = str(latest_after.get("alert_level", "BAJO"))
-    before_score = float(working_before["risk_score"].iloc[-1]) if not working_before.empty else 0.0
-    after_score = float(working_after["risk_score"].iloc[-1]) if not working_after.empty else before_score
+    before_score = float(latest_before.get("risk_score_operational", latest_before.get("risk_score", 0.0)))
+    after_score = float(latest_after.get("risk_score_operational", latest_after.get("risk_score", before_score)))
+    before_raw = float(latest_before.get("risk_score", 0.0))
+    after_raw = float(latest_after.get("risk_score", before_raw))
 
     c1, c2 = st.columns(2, gap="medium")
     with c1:
@@ -280,6 +346,11 @@ def render(base_df: pd.DataFrame) -> None:
         st.metric("Score de riesgo", f"{after_score:.3f}", f"{after_score - before_score:+.3f}")
     with m3:
         st.metric("Proyección 2h", pred_after["projected_level"], pred_after["trend_direction"].upper())
+
+    if (after_score - after_raw) >= 0.03:
+        st.warning(
+            f"Aviso de acople: score base {after_raw:.3f} -> score operativo {after_score:.3f} por severidad en sensores/relaciones."
+        )
 
     before_reasons = set(_split_reasons(str(latest_before.get("alert_reasons", ""))))
     after_reasons = set(_split_reasons(str(latest_after.get("alert_reasons", ""))))

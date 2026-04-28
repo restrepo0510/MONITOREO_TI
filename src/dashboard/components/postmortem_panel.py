@@ -6,6 +6,55 @@ Este archivo se completará en el desarrollo del dashboard.
 import pandas as pd
 import streamlit as st
 
+SENSOR_COLUMNS = [
+    "TP3_mean",
+    "H1_mean",
+    "DV_pressure_mean",
+    "Motor_Current_mean",
+    "Oil_Temperature_mean",
+    "MPG_last",
+    "TOWERS_last",
+]
+
+
+def _pick_score_column(df: pd.DataFrame) -> str:
+    if "risk_score_operational" in df.columns:
+        return "risk_score_operational"
+    return "risk_score"
+
+
+def _sensor_key_from_reason(reason_text: str) -> list[str]:
+    sensors: list[str] = []
+    for chunk in str(reason_text).split("|"):
+        part = chunk.strip()
+        if ":" not in part:
+            continue
+        prefix = part.split(":", 1)[0].strip()
+        if prefix in SENSOR_COLUMNS and prefix not in sensors:
+            sensors.append(prefix)
+    return sensors
+
+
+def _format_sensor_name(sensor: str) -> str:
+    return sensor.replace("_mean", "").replace("_last", "")
+
+
+def _format_sensor_snapshot(row: pd.Series, sensors: list[str], max_items: int = 3) -> str:
+    selected = sensors if sensors else [s for s in SENSOR_COLUMNS if s in row.index]
+    selected = [s for s in selected if s in row.index][:max_items]
+    if not selected:
+        return "Sin sensores destacados."
+
+    parts = []
+    for sensor in selected:
+        value = row.get(sensor)
+        try:
+            num = float(value)
+            parts.append(f"{_format_sensor_name(sensor)}={num:.3f}")
+        except Exception:
+            parts.append(f"{_format_sensor_name(sensor)}={value}")
+    return " | ".join(parts)
+
 
 def build_alert_episodes(alerts_df: pd.DataFrame) -> pd.DataFrame:
     if alerts_df is None or alerts_df.empty:
@@ -23,19 +72,44 @@ def build_alert_episodes(alerts_df: pd.DataFrame) -> pd.DataFrame:
     )
     work["episode_id"] = work["episode_break"].cumsum()
 
-    episodes = (
-        work.groupby("episode_id", dropna=False)
-        .agg(
-            start=("timestamp", "min"),
-            end=("timestamp", "max"),
-            level=("alert_level", lambda s: "ALTO" if (s == "ALTO").any() else "MEDIO"),
-            max_score=("risk_score", "max"),
-            sources=("alert_sources", lambda s: ", ".join(sorted(set(s)))),
-            reasons=("alert_reasons", "last"),
-            windows=("alert_level", "size"),
+    score_col = _pick_score_column(work)
+    episodes_rows = []
+    for _, group in work.groupby("episode_id", dropna=False):
+        group_sorted = group.sort_values("timestamp")
+        peak_idx = group_sorted[score_col].astype(float).idxmax()
+        peak_row = group_sorted.loc[peak_idx]
+        reasons = str(peak_row.get("alert_reasons", "")).strip() or str(group_sorted["alert_reasons"].iloc[-1])
+        active_sensors = _sensor_key_from_reason(reasons)
+        event_time = pd.to_datetime(peak_row.get("sandbox_event_created_at"), errors="coerce")
+        if pd.isna(event_time):
+            event_time = pd.to_datetime(peak_row.get("timestamp"), errors="coerce")
+        if pd.isna(event_time):
+            event_time = group_sorted["timestamp"].max()
+
+        event_note = str(peak_row.get("sandbox_event_note", "")).strip()
+        if not event_note:
+            event_note = f"Evento detectado por: {reasons.split('|')[0].strip()}"
+
+        episodes_rows.append(
+            {
+                "start": group_sorted["timestamp"].min(),
+                "end": group_sorted["timestamp"].max(),
+                "peak_time": peak_row.get("timestamp"),
+                "event_time": event_time,
+                "level": "ALTO" if (group_sorted["alert_level"] == "ALTO").any() else "MEDIO",
+                "max_score": float(group_sorted[score_col].astype(float).max()),
+                "sources": ", ".join(sorted(set(group_sorted["alert_sources"].astype(str)))),
+                "reasons": reasons,
+                "windows": int(len(group_sorted)),
+                "max_triggers": int(group_sorted["alert_trigger_count"].astype(float).max())
+                if "alert_trigger_count" in group_sorted.columns
+                else 0,
+                "sensor_snapshot": _format_sensor_snapshot(peak_row, active_sensors, max_items=3),
+                "event_note": event_note,
+            }
         )
-        .reset_index(drop=True)
-    )
+
+    episodes = pd.DataFrame(episodes_rows)
     episodes["duration_min"] = (
         (episodes["end"] - episodes["start"]).dt.total_seconds() / 60.0
     ).round(1)
@@ -104,6 +178,11 @@ def render_postmortem_panel(alerts_df: pd.DataFrame, prediction: dict) -> None:
     for idx, (_, row) in enumerate(episodes.head(3).iterrows()):
         bg, fg = _chip(row["level"])
         cause = str(row["reasons"]).split("|")[0].strip()
+        event_time = pd.to_datetime(row.get("event_time", row.get("peak_time")), errors="coerce")
+        if pd.isna(event_time):
+            event_time = pd.to_datetime(row.get("peak_time"), errors="coerce")
+        event_time_txt = event_time.strftime("%d/%m %H:%M:%S") if pd.notna(event_time) else "-"
+        event_note = str(row.get("event_note", "")).strip() or "Sin descripcion de evento."
         with cols[idx]:
             st.markdown(
                 f"""
@@ -114,10 +193,15 @@ def render_postmortem_panel(alerts_df: pd.DataFrame, prediction: dict) -> None:
                     </div>
                     <div class="jj-postmortem-chip" style="background:{bg}; color:{fg};">{row['level']}</div>
                     <div class="jj-postmortem-copy">
+                        Hora del evento: {event_time_txt}<br>
                         Duracion: {row['duration_min']:.1f} min<br>
                         Ventanas afectadas: {int(row['windows'])}<br>
+                        Triggers maximos: {int(row.get('max_triggers', 0))}<br>
                         Score maximo: {float(row['max_score']):.3f}<br>
                         Origenes: {row['sources']}<br><br>
+                        Sensores clave: {row.get('sensor_snapshot', 'Sin sensores destacados.')}<br>
+                        Evento: {event_note}<br>
+                        <br>
                         Driver principal: {cause}
                     </div>
                 </div>
@@ -125,6 +209,3 @@ def render_postmortem_panel(alerts_df: pd.DataFrame, prediction: dict) -> None:
                 unsafe_allow_html=True,
             )
 
-    st.caption(
-        f"Lectura ejecutiva: {prediction.get('message', 'Sin proyeccion activa')}."
-    )

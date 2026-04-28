@@ -193,35 +193,8 @@ def render_financial_section(alerts_df, prediction):
     </p>
     """, unsafe_allow_html=True)
 
-    # ===== SECCIÓN: CAUSAS ACTUALES DEL RIESGO =====
-    st.markdown("""
-    <div style="margin-top: 32px; padding-top: 24px; border-top: 2px solid #E5E7EB;">
-        <h3 style="color: #0F1E3C; font-family: Arial; font-size: 18px; margin: 0 0 16px 0; font-weight: bold;">
-            Causas Actuales del Riesgo
-        </h3>
-        <p style="color: #6B7280; font-family: Arial; font-size: 14px; margin: 0;">
-            Factores que están empujando el riesgo en la lectura actual.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Renderizar causas de riesgo
-    _render_risk_causes()
-
-    # ===== SECCIÓN: PLAN DE ACCIÓN RECOMENDADO =====
-    st.markdown("""
-    <div style="margin-top: 32px; padding-top: 24px; border-top: 2px solid #E5E7EB;">
-        <h3 style="color: #0F1E3C; font-family: Arial; font-size: 18px; margin: 0 0 16px 0; font-weight: bold;">
-            Plan de Acción Recomendado
-        </h3>
-        <p style="color: #6B7280; font-family: Arial; font-size: 14px; margin: 0;">
-            Acciones operativas sugeridas según el estado del tren.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Renderizar plan de acción
-    _render_action_plan(prediction)
+    # Nota: Causas y Plan de Acción se renderizan fuera de este bloque
+    # para evitar duplicación de secciones en la vista de tren.
 
 
 def _render_risk_causes():

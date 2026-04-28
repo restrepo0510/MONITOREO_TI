@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from typing import Optional
 
 import pandas as pd
@@ -7,7 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.dashboard.cache_manager import load_dashboard_data
+from src.dashboard.utils.alert_engine import evaluate_alerts, resolve_alert_thresholds
 from src.dashboard.views.ui_kit import inject_operational_ui, render_section_header, render_view_header
 
 TRAIN_ID_CANDIDATES = ["train_id", "train", "id_train", "apu_id", "engine_id"]
@@ -48,26 +49,23 @@ def _kpi_card(label: str, value: str, delta: str = "", icon: str = "📊", color
     """
     Renderiza una tarjeta KPI hermosa con HTML/CSS.
     """
-    delta_html = ""
-    if delta:
-        delta_html = f'<div style="font-size: 13px; color: #6B7280; margin-top: 4px;">{delta}</div>'
-    
-    card_html = f"""
-    <div style="
-        background: linear-gradient(135deg, {color}08 0%, {color}04 100%);
-        border: 2px solid {color}25;
-        border-radius: 12px;
-        padding: 20px 16px;
-        text-align: center;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    ">
-        <div style="font-size: 28px; margin-bottom: 6px;">{icon}</div>
-        <div style="font-size: 11px; color: #6B7280; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;">{label}</div>
-        <div style="font-size: 24px; color: {color}; font-weight: 700; margin-top: 8px; font-family: 'Arial Black';">{value}</div>
-        {delta_html}
-    </div>
-    """
+    safe_label = html.escape(str(label or "")).replace("\n", "<br>")
+    safe_value = html.escape(str(value or "")).replace("</div>", "").replace("<div>", "")
+    safe_icon = html.escape(str(icon or "")).replace("</div>", "").replace("<div>", "")
+    safe_delta = html.escape(str(delta or "")).replace("</div>", "").replace("<div>", "")
+
+    card_html = (
+        f'<div style="background: linear-gradient(135deg, {color}08 0%, {color}04 100%); '
+        f'border: 2px solid {color}25; border-radius: 12px; padding: 20px 16px; text-align: center; '
+        f'transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">'
+        f'<div style="font-size: 28px; margin-bottom: 6px;">{safe_icon}</div>'
+        f'<div style="font-size: 11px; color: #6B7280; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;">{safe_label}</div>'
+        f'<div style="font-size: 24px; color: {color}; font-weight: 700; margin-top: 8px; font-family: Arial Black;">{safe_value}</div>'
+    )
+    if safe_delta:
+        card_html += f'<div style="font-size: 13px; color: #6B7280; margin-top: 4px;">{safe_delta}</div>'
+    card_html += "</div>"
+
     st.markdown(card_html, unsafe_allow_html=True)
 
 
@@ -388,11 +386,13 @@ def render(_df: pd.DataFrame) -> None:
     """, unsafe_allow_html=True)
     
     inject_operational_ui()
-    data = load_dashboard_data()
-    df = data["df"].copy().sort_values("timestamp")
-    alert_df = data["alert_df"]
-
+    df = _df.copy().sort_values("timestamp")
     df, train_col = _with_train_id(df)
+    thresholds, _ = resolve_alert_thresholds(df)
+    alert_df, _meta = evaluate_alerts(df.tail(2400), thresholds=thresholds)
+    if alert_df is None:
+        alert_df = pd.DataFrame()
+
     latest = _latest_per_train(df, train_col)
 
     total_trains = max(1, len(latest))
@@ -401,6 +401,32 @@ def render(_df: pd.DataFrame) -> None:
     low = int((latest["risk_level"] == "BAJO").sum())
 
     mean_risk = float(pd.to_numeric(latest["risk_score"], errors="coerce").fillna(0).mean())
+    # El resumen ejecutivo debe reflejar el riesgo operacional final (alert_level),
+    # no solo el risk_level base del score original.
+    if not alert_df.empty and "alert_level" in alert_df.columns:
+        if train_col in alert_df.columns:
+            per_train_latest_alert = (
+                alert_df.sort_values("timestamp")
+                .groupby(train_col, as_index=False)
+                .tail(1)
+                .reset_index(drop=True)
+            )
+            levels = per_train_latest_alert["alert_level"].astype(str).str.upper()
+            total_trains = max(1, len(per_train_latest_alert))
+            high = int((levels == "ALTO").sum())
+            medium = int((levels == "MEDIO").sum())
+            low = max(total_trains - high - medium, 0)
+            score_col = "risk_score_operational" if "risk_score_operational" in per_train_latest_alert.columns else "risk_score"
+            mean_risk = float(pd.to_numeric(per_train_latest_alert[score_col], errors="coerce").fillna(0).mean())
+        else:
+            latest_level = str(alert_df.sort_values("timestamp").iloc[-1].get("alert_level", "BAJO")).upper()
+            high = 1 if latest_level == "ALTO" else 0
+            medium = 1 if latest_level == "MEDIO" else 0
+            low = 1 if latest_level == "BAJO" else 0
+            total_trains = 1
+            score_col = "risk_score_operational" if "risk_score_operational" in alert_df.columns else "risk_score"
+            mean_risk = float(pd.to_numeric(alert_df[score_col], errors="coerce").fillna(0).iloc[-1])
+
     uptime = max(0.0, 100 - (high / total_trains) * 100 * 0.95)
     efficiency = max(0.0, 100 - mean_risk * 100)
     health = max(0.0, 100 - mean_risk * 80)

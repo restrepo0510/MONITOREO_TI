@@ -150,6 +150,48 @@ def _context_value(series: pd.Series | None, pos: int, default: float | None = N
     return _safe_float(series.iloc[pos], default=default or 0.0)
 
 
+def _score_to_level(score: float) -> str:
+    if score >= RISK_THRESHOLD_HIGH:
+        return "ALTO"
+    if score >= RISK_THRESHOLD_MEDIUM:
+        return "MEDIO"
+    return "BAJO"
+
+
+def _compute_operational_risk_score(
+    base_score: float,
+    sensor_level: str,
+    relation_level: str,
+    sensor_trigger_count: int,
+    relation_trigger_count: int,
+) -> float:
+    """
+    Ajusta el score general cuando hay evidencia fuerte en sensores/relaciones.
+    Objetivo: evitar que una anomalia severa quede solo en tarjeta de sensor.
+    """
+    score = float(np.clip(base_score, 0.0, 1.0))
+
+    floor = 0.0
+    if sensor_level == "ALTO" or relation_level == "ALTO":
+        floor = max(floor, float(RISK_THRESHOLD_HIGH + 0.02))
+    elif sensor_level == "MEDIO" or relation_level == "MEDIO":
+        floor = max(floor, float(RISK_THRESHOLD_MEDIUM + 0.03))
+
+    trigger_boost = min(
+        0.12,
+        (max(sensor_trigger_count, 0) * 0.02)
+        + (max(relation_trigger_count, 0) * 0.025),
+    )
+
+    adjusted = max(score, floor)
+    if adjusted >= RISK_THRESHOLD_HIGH:
+        adjusted = min(1.0, adjusted + min(trigger_boost, 0.06))
+    else:
+        adjusted = min(1.0, adjusted + trigger_boost)
+
+    return float(np.clip(adjusted, 0.0, 1.0))
+
+
 def _eval_sensor_rules(
     row: pd.Series,
     thresholds: Dict[str, Any],
@@ -431,6 +473,9 @@ def evaluate_alerts(
     alert_reasons: List[str] = []
     alert_sources: List[str] = []
     alert_trigger_count: List[int] = []
+    risk_scores_operational: List[float] = []
+    risk_levels_operational: List[str] = []
+    risk_score_deltas: List[float] = []
 
     # Evaluacion fila a fila para preservar explicabilidad.
     for pos, (_, row) in enumerate(output.iterrows()):
@@ -463,8 +508,19 @@ def evaluate_alerts(
                 context_row=context_row,
             )
 
+        base_score = _safe_float(row.get("risk_score"), default=0.0)
+        operational_score = _compute_operational_risk_score(
+            base_score=base_score,
+            sensor_level=sensor_level,
+            relation_level=relation_level,
+            sensor_trigger_count=len(sensor_reasons),
+            relation_trigger_count=len(relation_reasons),
+        )
+        operational_level = _score_to_level(operational_score)
+
         final_level = _promote_level(risk_level, sensor_level)
         final_level = _promote_level(final_level, relation_level)
+        final_level = _promote_level(final_level, operational_level)
 
         sources = []
         if risk_reasons:
@@ -475,6 +531,10 @@ def evaluate_alerts(
             sources.append("relaciones")
 
         reasons = risk_reasons + sensor_reasons + relation_reasons
+        if operational_score > (base_score + 0.02):
+            reasons.append(
+                f"risk_score_operational: ajuste de severidad eleva score de {base_score:.3f} a {operational_score:.3f}"
+            )
         if not reasons:
             reasons = ["Sin condiciones de alerta activas."]
 
@@ -484,11 +544,17 @@ def evaluate_alerts(
         alert_trigger_count.append(
             len(risk_reasons) + len(sensor_reasons) + len(relation_reasons)
         )
+        risk_scores_operational.append(operational_score)
+        risk_levels_operational.append(operational_level)
+        risk_score_deltas.append(float(operational_score - base_score))
 
     output["alert_level"] = alert_levels
     output["alert_sources"] = alert_sources
     output["alert_trigger_count"] = alert_trigger_count
     output["alert_reasons"] = alert_reasons
+    output["risk_score_operational"] = risk_scores_operational
+    output["risk_level_operational"] = risk_levels_operational
+    output["risk_score_delta"] = risk_score_deltas
 
     meta = {
         "engine_version": "v2",
@@ -497,6 +563,7 @@ def evaluate_alerts(
         "risk_threshold_medium": float(RISK_THRESHOLD_MEDIUM),
         "risk_threshold_high": float(RISK_THRESHOLD_HIGH),
         "uses_relation_rules": True,
+        "uses_operational_score_adjustment": True,
     }
     if has_sensor_thresholds:
         meta["sensor_threshold_version"] = thresholds.get("version")
@@ -573,6 +640,17 @@ def evaluate_latest_alert(
     final_level = _promote_level(risk_level, sensor_level)
     final_level = _promote_level(final_level, relation_level)
 
+    base_score = _safe_float(latest.get("risk_score"), default=0.0)
+    operational_score = _compute_operational_risk_score(
+        base_score=base_score,
+        sensor_level=sensor_level,
+        relation_level=relation_level,
+        sensor_trigger_count=len(sensor_reasons),
+        relation_trigger_count=len(relation_reasons),
+    )
+    operational_level = _score_to_level(operational_score)
+    final_level = _promote_level(final_level, operational_level)
+
     sources = []
     if risk_reasons:
         sources.append("riesgo")
@@ -582,6 +660,10 @@ def evaluate_latest_alert(
         sources.append("relaciones")
 
     reasons = risk_reasons + sensor_reasons + relation_reasons
+    if operational_score > (base_score + 0.02):
+        reasons.append(
+            f"risk_score_operational: ajuste de severidad eleva score de {base_score:.3f} a {operational_score:.3f}"
+        )
     if not reasons:
         reasons = ["Sin condiciones de alerta activas."]
 
@@ -592,6 +674,9 @@ def evaluate_latest_alert(
         "alert_reasons": " | ".join(reasons),
         "risk_level": latest.get("risk_level"),
         "risk_score": latest.get("risk_score"),
+        "risk_level_operational": operational_level,
+        "risk_score_operational": operational_score,
+        "risk_score_delta": float(operational_score - base_score),
         "timestamp": latest.get("timestamp"),
     }
 
@@ -601,6 +686,7 @@ def evaluate_latest_alert(
         "threshold_source": threshold_source,
         "risk_threshold_medium": float(RISK_THRESHOLD_MEDIUM),
         "risk_threshold_high": float(RISK_THRESHOLD_HIGH),
+        "uses_operational_score_adjustment": True,
     }
     if has_sensor_thresholds:
         meta["sensor_threshold_version"] = thresholds.get("version")
@@ -642,8 +728,9 @@ def build_prediction_advisory(
         .copy()
         .sort_values("timestamp")
     )
+    score_col = "risk_score_operational" if "risk_score_operational" in recent.columns else "risk_score"
     if len(recent) < 5:
-        current_score = _safe_float(df.iloc[-1].get("risk_score"), default=0.0)
+        current_score = _safe_float(df.iloc[-1].get(score_col), default=0.0)
         return {
             "status": "insuficiente",
             "current_score": current_score,
@@ -661,18 +748,18 @@ def build_prediction_advisory(
     elapsed_min = (
         (recent["timestamp"] - recent["timestamp"].iloc[0]).dt.total_seconds() / 60.0
     ).astype(float)
-    current_score = _safe_float(recent["risk_score"].iloc[-1], default=0.0)
+    current_score = _safe_float(recent[score_col].iloc[-1], default=0.0)
 
     if elapsed_min.max() <= 0:
         slope_per_min = 0.0
         projected_score = current_score
         r2 = 0.0
     else:
-        slope_per_min, intercept = np.polyfit(elapsed_min, recent["risk_score"], 1)
+        slope_per_min, intercept = np.polyfit(elapsed_min, recent[score_col], 1)
         fitted = (slope_per_min * elapsed_min) + intercept
-        residual = recent["risk_score"] - fitted
+        residual = recent[score_col] - fitted
         ss_res = float((residual**2).sum())
-        ss_tot = float(((recent["risk_score"] - recent["risk_score"].mean()) ** 2).sum())
+        ss_tot = float(((recent[score_col] - recent[score_col].mean()) ** 2).sum())
         r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
         projected_score = float(
             np.clip(current_score + (slope_per_min * horizon_minutes), 0.0, 1.0)
@@ -745,5 +832,6 @@ def build_prediction_advisory(
         "horizon_minutes": int(horizon_minutes),
         "slope_per_min": float(slope_per_min),
         "r2": float(r2),
+        "projection_score_source": score_col,
         "alert_snapshot": latest_alert,
     }

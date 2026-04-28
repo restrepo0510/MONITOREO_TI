@@ -7,9 +7,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.dashboard.cache_manager import load_dashboard_data
 from src.dashboard.components.realtime_indicators import render_impact_card
 from src.dashboard.theme import RISK_THRESHOLDS
+from src.dashboard.utils.alert_engine import evaluate_alerts, resolve_alert_thresholds
 from src.dashboard.views.ui_kit import (
     inject_operational_ui,
     render_level_badge,
@@ -141,9 +141,11 @@ def _drivers_summary(alert_df: pd.DataFrame) -> pd.DataFrame:
 
 def render(_df: pd.DataFrame) -> None:
     inject_operational_ui()
-    data = load_dashboard_data()
-    df = data["df"].copy().sort_values("timestamp")
-    alert_df = data["alert_df"]
+    df = _df.copy().sort_values("timestamp")
+    thresholds, _ = resolve_alert_thresholds(df)
+    alert_df, _meta = evaluate_alerts(df.tail(2400), thresholds=thresholds)
+    if alert_df is None:
+        alert_df = pd.DataFrame()
     df, train_col = _with_train_id(df)
     latest_trains = _latest_per_train(df, train_col)
 
