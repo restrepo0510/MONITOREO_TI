@@ -7,10 +7,11 @@ import streamlit as st
 
 
 _TONE_STYLES = {
-    "blue": {"accent": "#234B8D", "bg": "#FFFFFF"},
-    "yellow": {"accent": "#D5B700", "bg": "#FFFCE0"},
-    "red": {"accent": "#C0392B", "bg": "#FFF1F1"},
-    "dark": {"accent": "#0F1E3C", "bg": "#F4F4F9"},
+    "blue": {"accent": "#082A70", "bg": "#FFFFFF"},
+    "yellow": {"accent": "#7E6900", "bg": "#FFFCE8"},
+    "red": {"accent": "#9E1E33", "bg": "#FFF1F2"},
+    "green": {"accent": "#2E8E5B", "bg": "#EAF7EE"},
+    "dark": {"accent": "#121212", "bg": "#F8FAF7"},
 }
 
 
@@ -19,35 +20,36 @@ def _ensure_styles():
         """
         <style>
         .jj-kpi-card {
-            border-radius: 18px;
-            padding: 1rem 1rem 0.95rem 1rem;
-            border: 1px solid rgba(35, 75, 141, 0.08);
-            box-shadow: 0 18px 34px rgba(15, 30, 60, 0.08);
-            min-height: 152px;
+            border-radius: 24px;
+            padding: 1.05rem 1.05rem 0.95rem 1.05rem;
+            border: 1px solid rgba(8, 42, 112, 0.18);
+            box-shadow: 0 14px 30px rgba(16, 31, 56, 0.08);
+            min-height: 162px;
         }
         .jj-kpi-label {
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             text-transform: uppercase;
-            letter-spacing: 0.10em;
-            opacity: 0.72;
-            font-weight: 700;
-            margin-bottom: 0.6rem;
+            letter-spacing: 0.11em;
+            opacity: 0.8;
+            font-weight: 760;
+            margin-bottom: 0.52rem;
+            color: #5F6B7A;
         }
         .jj-kpi-value {
-            font-size: 1.65rem;
+            font-size: 2rem;
             line-height: 1.04;
-            font-weight: 800;
-            margin-bottom: 0.4rem;
+            font-weight: 820;
+            margin-bottom: 0.33rem;
         }
         .jj-kpi-delta {
-            font-size: 0.84rem;
+            font-size: 0.79rem;
             font-weight: 700;
             margin-bottom: 0.32rem;
         }
         .jj-kpi-caption {
-            font-size: 0.86rem;
-            line-height: 1.42;
-            color: #4A5672;
+            font-size: 0.8rem;
+            line-height: 1.43;
+            color: #5F6B7A;
         }
         </style>
         """,

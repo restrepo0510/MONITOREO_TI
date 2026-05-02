@@ -25,19 +25,39 @@ def _inject_sensor_chart_css():
         """
         <style>
         .sensor-card {
-            background: #ffffff;
-            border: none;
-            border-left: 6px solid #234B8D;
-            border-radius: 10px;
-            padding: 10px 12px 8px 12px;
-            margin-bottom: 0;
-            box-shadow: none;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAF7 100%);
+            border: 1px solid rgba(8, 42, 112, 0.18);
+            border-radius: 26px;
+            padding: 1rem 1rem 0.86rem 1rem;
+            margin-bottom: 0.36rem;
+            box-shadow: 0 14px 30px rgba(16, 31, 56, 0.08);
+            position: relative;
+        }
+        .sensor-card::before {
+            content: "";
+            position: absolute;
+            top: 0.85rem;
+            left: 0.85rem;
+            width: 7px;
+            height: 48px;
+            border-radius: 999px;
+            background: var(--sensor-accent, #082A70);
+            opacity: 0.95;
+        }
+        .sensor-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.8rem;
+            padding-left: 1rem;
         }
         .sensor-title {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #000000;
-            margin-bottom: 4px;
+            font-size: 0.92rem;
+            font-weight: 750;
+            color: #082A70;
+            margin-bottom: 0.26rem;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
         }
         .sensor-title-wrap {
             display: inline-block;
@@ -47,8 +67,9 @@ def _inject_sensor_chart_css():
         .sensor-tooltip {
             visibility: hidden;
             opacity: 0;
-            width: 300px;
-            background: #234B8D;
+            width: max-content;
+            max-width: min(420px, 90vw);
+            background: #082A70;
             color: #FFFFFF;
             text-align: left;
             border-radius: 10px;
@@ -59,6 +80,10 @@ def _inject_sensor_chart_css():
             left: 0;
             line-height: 1.35;
             font-size: 0.82rem;
+            text-transform: lowercase;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
             transition: opacity 0.18s ease;
         }
@@ -66,39 +91,78 @@ def _inject_sensor_chart_css():
             visibility: visible;
             opacity: 1;
         }
-        .sensor-value {
-            font-size: 1.5rem;
+        .sensor-status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 0.26rem 0.65rem;
+            font-size: 0.67rem;
             font-weight: 800;
-            color: #000000;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+        .sensor-status-alto {
+            background: #FFF0F2;
+            color: #9E1E33;
+            border-color: rgba(158, 30, 51, 0.24);
+        }
+        .sensor-status-medio {
+            background: #FFFCE0;
+            color: #7E6900;
+            border-color: rgba(126, 105, 0, 0.26);
+        }
+        .sensor-status-bajo {
+            background: #EDF3FF;
+            color: #082A70;
+            border-color: rgba(8, 42, 112, 0.26);
+        }
+        .sensor-status-missing {
+            background: #F2F4F7;
+            color: #5F6B7A;
+            border-color: rgba(95, 107, 122, 0.24);
+        }
+        .sensor-value {
+            padding-left: 1rem;
+            font-size: 2rem;
+            font-weight: 800;
+            color: #121212;
             line-height: 1.1;
-            margin-bottom: 3px;
+            margin-bottom: 0.18rem;
         }
         .sensor-meta {
-            font-size: 0.78rem;
-            color: #3e4a68;
-            margin-bottom: 3px;
+            padding-left: 1rem;
+            font-size: 0.76rem;
+            color: #5F6B7A;
+            margin-bottom: 0.2rem;
+            letter-spacing: 0.01em;
         }
         .sensor-meta-secondary {
-            font-size: 0.74rem;
-            color: #556283;
+            padding-left: 1rem;
+            font-size: 0.73rem;
+            color: #5F6B7A;
             line-height: 1.25;
         }
         [class*="st-key-sensor-panel-"] {
-            background: #ffffff;
-            border-radius: 14px;
-            padding: 8px 8px 8px 8px;
-            border: 1px solid rgba(35, 75, 141, 0.52);
-            margin-bottom: 14px;
-            overflow: hidden;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAF7 100%);
+            border-radius: 28px;
+            padding: 0.62rem 0.62rem 0.55rem 0.62rem;
+            border: 1px solid rgba(8, 42, 112, 0.20);
+            margin-bottom: 1.25rem;
+            overflow: visible;
+            box-shadow: 0 15px 32px rgba(16, 31, 56, 0.08);
         }
         [class*="st-key-sensor-panel-"] div[data-testid="stPlotlyChart"] {
-            border-top: 1px solid rgba(35, 75, 141, 0.48);
-            padding-top: 6px;
-            margin-top: 0;
+            border-top: 1px solid rgba(8, 42, 112, 0.18);
+            border-radius: 18px;
+            padding-top: 0.55rem;
+            margin-top: 0.25rem;
         }
         [class*="st-key-sensor-panel-"] div[data-testid="stPlotlyChart"] > div {
             border: none;
-            border-radius: 0;
+            border-radius: 16px;
             overflow: hidden;
             background: #ffffff;
         }
@@ -248,7 +312,7 @@ def _base_chart_layout(fig, show_legend=False):
     )
     fig.update_yaxes(
         showgrid=True,
-        gridcolor="rgba(35, 75, 141, 0.12)",
+        gridcolor="rgba(8, 42, 112, 0.12)",
         zeroline=False,
         tickfont=dict(size=9, color="#4d5875"),
     )
@@ -464,7 +528,7 @@ def _build_oil_temperature_figure(sensor_df, sensor, palette, normal_low, normal
     fig.update_xaxes(showgrid=False, tickfont=dict(size=9, color="#4d5875"), row=1, col=2)
     fig.update_yaxes(
         showgrid=True,
-        gridcolor="rgba(35, 75, 141, 0.12)",
+        gridcolor="rgba(8, 42, 112, 0.12)",
         zeroline=False,
         tickfont=dict(size=9, color="#4d5875"),
         row=1,
@@ -499,7 +563,7 @@ def _build_towers_figure(sensor_df, sensor, palette, on_threshold):
         tickvals=[0, 1],
         ticktext=["Inactivo", "Activo"],
         showgrid=True,
-        gridcolor="rgba(35, 75, 141, 0.12)",
+        gridcolor="rgba(8, 42, 112, 0.12)",
     )
     return fig, transitions, active_pct, inactive_pct
 
@@ -539,6 +603,12 @@ def _render_header(
     safe_title = html.escape(display_name)
     safe_description = html.escape(description)
     safe_extra = html.escape(extra_text)
+    normalized_risk = str(risk_label).strip().upper()
+    risk_css = {
+        "ALTO": "sensor-status-alto",
+        "MEDIO": "sensor-status-medio",
+        "BAJO": "sensor-status-bajo",
+    }.get(normalized_risk, "sensor-status-missing")
 
     if description:
         title_html = (
@@ -554,10 +624,13 @@ def _render_header(
 
     st.markdown(
         f"""
-        <div class="sensor-card" style="border-left-color:{accent_color};">
-            {title_html}
+        <div class="sensor-card" style="--sensor-accent:{accent_color};">
+            <div class="sensor-head">
+                {title_html}
+                <span class="sensor-status-badge {risk_css}">{normalized_risk}</span>
+            </div>
             <div class="sensor-value">{value_text}</div>
-            <div class="sensor-meta">Delta reciente: {delta_text} | Estado: {risk_label}</div>
+            <div class="sensor-meta">Delta reciente: {delta_text}</div>
             {extra_html}
         </div>
         """,

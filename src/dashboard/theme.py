@@ -1,9 +1,9 @@
 PALETTE = {
-    "yellow": "#FFE600",
+    "yellow": "#F6C50E",
     "black": "#000000",
     "light_blue": "#B8DBD9",
-    "ghost_white": "#F4F4F9",
-    "steel_azure": "#234B8D",
+    "ghost_white": "#F9F8F8",
+    "steel_azure": "#082A70",
     "alert_red": "#D32F2F",
 }
 

@@ -1,5 +1,6 @@
-import os
+﻿import os
 import sys
+import importlib
 
 import streamlit as st
 
@@ -9,12 +10,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from src.dashboard.theme_manager import inject_theme_css
 from src.dashboard.cache_manager import invalidate_all_caches
 from src.dashboard.data_loader import load_scores
+from src.dashboard.views.ui_kit import inject_custom_css
 from src.dashboard.views import (
     alerts,
     home_legacy_operational,
     home_general,
     manual_test,
-    premium_full_latest,
     train_details,
 )
 
@@ -32,6 +33,7 @@ st.set_page_config(
 
 # Inyectar estilos UNA SOLA VEZ (NO en cada render)
 inject_theme_css()
+inject_custom_css()
 
 
 # ============================================================================
@@ -53,7 +55,6 @@ NAV_SECTIONS = {
         "title": "VISTAS SECUNDARIAS",
         "question": "Decision y diagnostico",
         "items": [
-            ("premium_full_latest", "Resumen Ejecutivo"),
             ("detail", "Detalle de Señales"),
         ],
     },
@@ -104,7 +105,54 @@ def _set_nav(view_key: str) -> None:
     st.session_state["nav_view"] = view_key
 
 with st.sidebar:
-    st.markdown("## MonitoreoTI")
+    st.markdown(
+        """
+        <style>
+        .sb-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .sb-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0C3A90, #082A70);
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 20px;
+            line-height: 1;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+        .sb-brand-title {
+            margin: 0;
+            font-size: 35px;
+            font-weight: 700;
+            color: #FFFFFF;
+            line-height: 1.1;
+        }
+        .sb-brand-sub {
+            margin: 2px 0 0 0;
+            font-size: 12px;
+            color: rgba(255,255,255,0.78);
+            line-height: 1.35;
+        }
+        </style>
+        <div class="sb-brand">
+            <div class="sb-logo">M</div>
+            <div>
+                <p class="sb-brand-title">MonitoreoTI</p>
+                <p class="sb-brand-sub">Sistema de Monitoreo de Infraestructura TI</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.markdown("---")
 
     if "nav_view" not in st.session_state:
@@ -122,9 +170,13 @@ with st.sidebar:
         st.markdown("")
 
     view_key = st.session_state.get("nav_view", "system_home")
+    valid_views = {"system_home", "train_operational", "alerts", "sandbox", "detail"}
+    if view_key not in valid_views:
+        st.session_state["nav_view"] = "system_home"
+        st.rerun()
 
     st.markdown("---")
-    
+
     # Control de sandbox
     if st.session_state.get("sandbox_active", False):
         st.warning("Sandbox activo", icon="⚠️")
@@ -139,7 +191,7 @@ with st.sidebar:
         if st.button("Refrescar", use_container_width=True, help="Limpia cache y recarga datos"):
             invalidate_all_caches()
             st.rerun()
-    
+
     with col2:
         if st.button("Info", use_container_width=True, help="Informacion del sistema"):
             st.info("Sistema global, operación por tren, análisis causal y simulación técnica.")
@@ -151,7 +203,7 @@ with st.sidebar:
 
 try:
     real_df = load_scores()
-    
+
     if st.session_state.get("sandbox_active", False) and "sandbox_df" in st.session_state:
         df = st.session_state["sandbox_df"].copy()
     else:
@@ -160,17 +212,21 @@ try:
     # Modo temporal solicitado por usuario: operar TODO el dashboard sobre un solo tren.
     df = _force_single_train(df)
     real_df = _force_single_train(real_df)
-    
+
     # ========================================================================
     # RENDERIZADO DE VISTAS
     # ========================================================================
-    
+
     if view_key == "system_home":
-        home_general.render(df)
+        # Recarga explícita para reflejar cambios visuales en navegación interna.
+        hg_module = importlib.import_module("src.dashboard.views.home_general")
+        importlib.reload(hg_module)
+        hg_module.render(df)
     elif view_key == "train_operational":
-        home_legacy_operational.render(df)
-    elif view_key == "premium_full_latest":
-        premium_full_latest.render(df)
+        # Recarga explícita para reflejar cambios visuales en navegación interna.
+        train_module = importlib.import_module("src.dashboard.views.home_legacy_operational")
+        importlib.reload(train_module)
+        train_module.render(df)
     elif view_key == "detail":
         train_details.render(df)
     elif view_key == "alerts":
@@ -181,4 +237,3 @@ try:
 except Exception as e:
     st.error(f"❌ Error cargando dashboard: {str(e)}")
     st.info("Intenta refrescar los datos o revisar la conexión al pipeline")
-

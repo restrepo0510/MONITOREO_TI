@@ -149,16 +149,17 @@ def render_impact_card(title: str, impact_value: str, impact_unit: str, descript
         description: Descripción
         icon: Emoji o icono
     """
-    # Construir HTML de forma limpia
-    card_html = '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; padding: 2rem; color: white; box-shadow: 0 12px 24px rgba(102, 126, 234, 0.3); border: 1px solid rgba(255,255,255,0.1);">'
-    card_html += '  <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">'
-    card_html += f'    <span style="font-size: 2.5rem;">{icon}</span>'
+    # Construir HTML de forma limpia (estilo institucional premium)
+    card_html = '<div style="background: linear-gradient(180deg, #FFFFFF 0%, #F8FAF7 100%); border-radius: 24px; padding: 1.25rem 1.1rem; color: #121212; box-shadow: 0 14px 30px rgba(16, 31, 56, 0.08); border: 1px solid rgba(35, 75, 141, 0.18); position: relative; overflow: hidden;">'
+    card_html += '  <div style="position:absolute; left:0; top:0; width:100%; height:5px; background:#234B8D;"></div>'
+    card_html += '  <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.85rem;">'
+    card_html += f'    <span style="font-size: 1.55rem; color:#234B8D;">{icon}</span>'
     card_html += '    <div>'
-    card_html += f'      <div style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 0.25rem;">{title}</div>'
-    card_html += f'      <div style="font-size: 2rem; font-weight: 900; line-height: 1;">{impact_value}<span style="font-size: 1.2rem; margin-left: 0.25rem;">{impact_unit}</span></div>'
+    card_html += f'      <div style="font-size: 0.75rem; color:#5F6B7A; margin-bottom: 0.2rem; letter-spacing:0.09em; text-transform:uppercase; font-weight:700;">{title}</div>'
+    card_html += f'      <div style="font-size: 1.85rem; font-weight: 820; line-height: 1.02; color:#234B8D;">{impact_value}<span style="font-size: 1rem; margin-left: 0.2rem; color:#5F6B7A;">{impact_unit}</span></div>'
     card_html += '    </div>'
     card_html += '  </div>'
-    card_html += f'  <div style="font-size: 0.9rem; opacity: 0.85; line-height: 1.5;">{description}</div>'
+    card_html += f'  <div style="font-size: 0.82rem; color:#5F6B7A; line-height: 1.5;">{description}</div>'
     card_html += '</div>'
     
     st.markdown(card_html, unsafe_allow_html=True)

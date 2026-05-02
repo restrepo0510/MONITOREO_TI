@@ -121,25 +121,25 @@ def _ensure_styles():
         """
         <style>
         .jj-postmortem-card {
-            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFF 100%);
-            border-radius: 22px;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAF7 100%);
+            border-radius: 24px;
             padding: 1rem 1rem 0.95rem 1rem;
-            border: 1px solid rgba(35, 75, 141, 0.10);
-            box-shadow: 0 18px 34px rgba(15, 30, 60, 0.08);
+            border: 1px solid rgba(35, 75, 141, 0.18);
+            box-shadow: 0 14px 30px rgba(16, 31, 56, 0.08);
             min-height: 250px;
         }
         .jj-postmortem-label {
-            font-size: 0.76rem;
+            font-size: 0.72rem;
             text-transform: uppercase;
             letter-spacing: 0.10em;
-            color: #6C7A95;
-            font-weight: 700;
+            color: #5F6B7A;
+            font-weight: 760;
             margin-bottom: 0.42rem;
         }
         .jj-postmortem-title {
             font-size: 1.04rem;
-            color: #0F1E3C;
-            font-weight: 800;
+            color: #234B8D;
+            font-weight: 810;
             margin-bottom: 0.4rem;
         }
         .jj-postmortem-chip {
@@ -151,9 +151,9 @@ def _ensure_styles():
             margin-bottom: 0.6rem;
         }
         .jj-postmortem-copy {
-            font-size: 0.86rem;
+            font-size: 0.82rem;
             line-height: 1.5;
-            color: #4F5D78;
+            color: #5F6B7A;
         }
         </style>
         """,
@@ -167,15 +167,53 @@ def _chip(level: str):
     return ("#FFFCE0", "#8D7300")
 
 
-def render_postmortem_panel(alerts_df: pd.DataFrame, prediction: dict) -> None:
+def render_postmortem_panel(alerts_df: pd.DataFrame, prediction: dict, max_columns: int = 3) -> None:
     _ensure_styles()
     episodes = build_alert_episodes(alerts_df)
     if episodes.empty:
         st.info("No hay episodios recientes para construir el postmortem.")
         return
 
-    cols = st.columns(min(3, len(episodes)), gap="medium")
-    for idx, (_, row) in enumerate(episodes.head(3).iterrows()):
+    card_count = min(3, len(episodes))
+    column_count = max(1, min(int(max_columns), card_count))
+
+    if column_count == 1:
+        for idx, (_, row) in enumerate(episodes.head(card_count).iterrows()):
+            bg, fg = _chip(row["level"])
+            cause = str(row["reasons"]).split("|")[0].strip()
+            event_time = pd.to_datetime(row.get("event_time", row.get("peak_time")), errors="coerce")
+            if pd.isna(event_time):
+                event_time = pd.to_datetime(row.get("peak_time"), errors="coerce")
+            event_time_txt = event_time.strftime("%d/%m %H:%M:%S") if pd.notna(event_time) else "-"
+            event_note = str(row.get("event_note", "")).strip() or "Sin descripcion de evento."
+            st.markdown(
+                f"""
+                <div class="jj-postmortem-card" style="margin-bottom:0.75rem;">
+                    <div class="jj-postmortem-label">Postmortem {idx + 1}</div>
+                    <div class="jj-postmortem-title">
+                        {row['start'].strftime('%d/%m %H:%M')} - {row['end'].strftime('%H:%M')}
+                    </div>
+                    <div class="jj-postmortem-chip" style="background:{bg}; color:{fg};">{row['level']}</div>
+                    <div class="jj-postmortem-copy">
+                        Hora del evento: {event_time_txt}<br>
+                        Duracion: {row['duration_min']:.1f} min<br>
+                        Ventanas afectadas: {int(row['windows'])}<br>
+                        Triggers maximos: {int(row.get('max_triggers', 0))}<br>
+                        Score maximo: {float(row['max_score']):.3f}<br>
+                        Origenes: {row['sources']}<br><br>
+                        Sensores clave: {row.get('sensor_snapshot', 'Sin sensores destacados.')}<br>
+                        Evento: {event_note}<br>
+                        <br>
+                        Driver principal: {cause}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        return
+
+    cols = st.columns(column_count, gap="medium")
+    for idx, (_, row) in enumerate(episodes.head(card_count).iterrows()):
         bg, fg = _chip(row["level"])
         cause = str(row["reasons"]).split("|")[0].strip()
         event_time = pd.to_datetime(row.get("event_time", row.get("peak_time")), errors="coerce")

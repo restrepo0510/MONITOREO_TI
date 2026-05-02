@@ -1,19 +1,21 @@
 from pathlib import Path
 import html
+import base64
 
 import plotly.graph_objects as go
 import streamlit as st
 
+from src.dashboard.components.icons import icon_chip
 from src.dashboard.components.financial_section import render_financial_section
 from src.dashboard.components.golden_signals import render_golden_signals
 from src.dashboard.components.operativity_panel import render_operativity_panel
 from src.dashboard.components.postmortem_panel import render_postmortem_panel
 from src.dashboard.components.sensor_chart import ensure_sensor_chart_styles, render_sensor_card
-from src.dashboard.components.station_line import render_station_line
+from src.dashboard.components.styles import inject_global_styles
+from src.dashboard.components.ui_kit import chart_card, kpi_card, section_title
 from src.dashboard.theme import PALETTE, RISK_THRESHOLDS
 from src.dashboard.views.ui_kit import (
     inject_operational_ui,
-    render_section_header,
 )
 from src.dashboard.utils.alert_engine import (
     build_prediction_advisory,
@@ -43,44 +45,267 @@ def _inject_css():
     st.markdown(
         """
         <style>
-        .home-legacy-title {
-            color: #234B8D;
-            font-size: 2.0rem;
+        
+        .train-hero {
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAF7 100%);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 24px;
+            box-shadow: 0 12px 28px rgba(16, 24, 40, 0.07);
+            padding: 1.05rem 1.05rem 0.95rem 1.05rem;
+            margin-bottom: 0.8rem;
+        }
+        .train-hero-title {
+            color: #082A70;
+            font-size: 2.6rem;
+            line-height: 1.05;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: 0.15px;
+            white-space: nowrap;
+        }
+        .train-hero-status {
+            color: #2ecc71;
+            font-size: 2rem;
+            line-height: 1.02;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .train-hero-copy {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 6px;
+        }
+        .train-hero-desc {
+            color: #6b7280;
+            font-size: 14px;
+            line-height: 1.4;
+            margin-top: 6px;
+        }
+        .train-hero-heading {
+            display: block;
+        }
+        .train-header-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #082A70;
+            color: #FFFFFF;
+        }
+        .train-header-icon svg {
+            width: 36px;
+            height: 36px;
+        }
+        .train-route-shell {
+            margin-top: 0;
+            background: #F6F8FC;
+            border: 1px solid rgba(8, 42, 112, 0.12);
+            border-radius: 16px;
+            padding: 14px 16px;
+            width: min(100%, 460px);
+            max-width: 100%;
+        }
+        .train-route-wrap {
+
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            margin-top: 10px;
+            padding-right: 28px;
+        }
+        .train-route-track {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+        }
+        .train-route-stop {
+            background: #EAF0FB;
+            color: #4A5B7C;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 12px;
+            padding: 7px 12px;
+            line-height: 1.15;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            position: relative;
+            text-align: center;
+            white-space: normal;
+            max-width: 128px;
+        }
+        .train-route-stop.active {
+            background: #082A70;
+            color: #FFFFFF;
+            padding: 8px 14px;
+            max-width: 160px;
+        }
+        .train-route-stop.active::after {
+            content: "";
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #F6C50E;
+            top: -5px;
+            right: -5px;
+        }
+        .train-route-arrow {
+            color: #6E84AB;
+            font-weight: 700;
+            font-size: 14px;
+            line-height: 1;
+        }
+        .train-header-right {
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            width: 100%;
+            margin-top: -110px;
+        }
+        .train-header-image {
+            width: 400px !important;
+            max-width: none !important;
+            display: block;
+        }
+        .train-status-strip {
+            border-radius: 16px;
+            border: 1px solid rgba(8, 42, 112, 0.14);
+            padding: 0.7rem 0.86rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+            box-shadow: 0 6px 16px rgba(16, 24, 40, 0.05);
+        }
+        .train-status-strip-left {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            min-width: 0;
+        }
+        .train-status-text {
+            color: #1d2b44;
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .train-status-score {
+            color: #5F6B7A;
+            font-size: 0.9rem;
+            font-weight: 620;
+        }
+        .train-status-bullet {
+            margin: 0 8px 0 6px;
+            color: #1d2b44;
+            font-weight: 700;
+        }
+        .train-state-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 0.5rem;
+            margin-bottom: 0.65rem;
+        }
+        .train-state-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #F6C50E;
+            flex-shrink: 0;
+        }
+        .train-state-title {
+            color: #1F3D8A;
+            font-size: 36px;
             font-weight: 800;
             line-height: 1.1;
             margin: 0;
+            letter-spacing: 0.1px;
         }
-        .home-legacy-section {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: #234B8D;
-            margin-top: 1.2rem;
-            margin-bottom: 0.6rem;
+        .train-strip-low {
+            background: linear-gradient(180deg, #F3FBF5 0%, #EEF8F1 100%);
         }
-        .home-legacy-risk-high {
-            background: #D32F2F;
-            color: #F4F4F9;
-            border: 1px solid #B71C1C;
-            border-radius: 12px;
-            padding: 0.75rem 1rem;
-            margin: 0.25rem 0 0.5rem 0;
+        .train-strip-medium {
+            background: linear-gradient(180deg, #FFFBEF 0%, #FFF7E4 100%);
         }
-        /* Compactar metricas en vista tren */
-        div[data-testid="stMetric"] {
-            border-radius: 10px !important;
-            padding: 0.18rem 0.42rem !important;
+        .train-strip-high {
+            background: linear-gradient(180deg, #FFF4F4 0%, #FFEEEE 100%);
         }
-        div[data-testid="stMetricLabel"] p {
+        .train-section-spacer {
+            margin-top: 0.55rem;
+        }
+        .train-tight-divider {
+            border-top: 1px solid rgba(8, 42, 112, 0.18);
+            margin: 0.12rem 0 0.08rem 0;
+        }
+        .train-tight-section-head {
+            margin-top: 0.06rem !important;
+            margin-bottom: 0.05rem !important;
+        }
+        .train-tight-section-head .ds-section-title {
+            font-size: 2rem !important;
+            line-height: 1.2 !important;
+        }
+        .train-tight-section-head .ds-section-subtitle {
+            margin-top: 0.04rem !important;
             font-size: 0.78rem !important;
-            line-height: 1.1 !important;
+            line-height: 1.2 !important;
         }
-        div[data-testid="stMetricValue"] {
-            font-size: 1.45rem !important;
-            line-height: 1.05 !important;
+        .train-plan-history-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.85rem;
         }
-        div[data-testid="stMetricDelta"] {
-            font-size: 0.78rem !important;
-            line-height: 1.1 !important;
+        @media (max-width: 900px) {
+            .train-plan-history-grid {
+                grid-template-columns: 1fr;
+            }
+            .train-header-icon {
+                width: 68px;
+                height: 68px;
+            }
+            .train-header-icon svg {
+                width: 34px;
+                height: 34px;
+            }
+            .train-hero-title {
+                font-size: 1.9rem;
+            }
+            .train-hero-status {
+                font-size: 1.35rem;
+            }
+            .train-route-shell {
+                width: 100%;
+                max-width: 100%;
+            }
+            .train-header-right {
+                margin-top: 0;
+            }
+            .train-header-image {
+                width: 280px !important;
+                max-width: 100% !important;
+            }
+            .train-route-wrap {
+                justify-content: flex-start;
+                margin-top: 0;
+                padding-right: 0;
+            }
+            .train-route-track {
+                flex-wrap: wrap;
+                white-space: normal;
+            }
+            .train-hero-heading {
+                display: block;
+            }
+            .train-state-title {
+                font-size: 30px;
+            }
         }
         </style>
         """,
@@ -113,26 +338,51 @@ def _selected_train_df(df):
 
 def _render_header(train_id: str):
     paths = _image_paths()
-    c1, c2, c3, c4 = st.columns([0.9, 2.35, 2.25, 1.85], gap="small", vertical_alignment="center")
+    c1, c2, c3 = st.columns([3.8, 3.2, 3.0], gap="medium", vertical_alignment="top")
 
     with c1:
-        if paths["logo"].exists():
-            st.image(str(paths["logo"]), width=145)
-        else:
-            st.caption("Logo no encontrado")
+        safe_train_id = html.escape(str(train_id))
+        st.markdown(
+            f"""
+            <div class="train-hero-heading">
+                <div class="train-hero-title">APU DEL TREN #{safe_train_id}</div>
+                <div class="train-hero-status">(Operativo)</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     with c2:
-        st.markdown(f'<div class="home-legacy-title">APU DEL TREN #{train_id} (Operativo)</div>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="train-route-wrap">
+                <div class="train-route-shell">
+                    <div class="train-route-track">
+                        <span class="train-route-stop">Parque inicial</span>
+                        <span class="train-route-arrow">&rarr;</span>
+                        <span class="train-route-stop active">Camino de mantenimiento</span>
+                        <span class="train-route-arrow">&rarr;</span>
+                        <span class="train-route-stop">Mantenimiento salida</span>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     with c3:
-        render_station_line(train_id=train_id, cycle_seconds=5)
-
-    with c4:
         if paths["train"].exists():
-            st.image(str(paths["train"]), width=335)
+            encoded_train = base64.b64encode(paths["train"].read_bytes()).decode("ascii")
+            st.markdown(
+                f'''
+                <div class="train-header-right">
+                    <img class="train-header-image" src="data:image/png;base64,{encoded_train}" alt="Tren APU {safe_train_id}" />
+                </div>
+                ''',
+                unsafe_allow_html=True,
+            )
         else:
             st.caption("Imagen de tren no encontrada")
-
 
 def _build_risk_chart(df):
     risk_df = df.tail(500).copy()
@@ -179,10 +429,10 @@ def _build_risk_chart(df):
         annotation_position="top left",
     )
     fig.update_layout(
-        height=320,
-        paper_bgcolor=PALETTE["ghost_white"],
+        height=362,
+        paper_bgcolor="white",
         plot_bgcolor="white",
-        margin=dict(t=20, b=10, l=8, r=8),
+        margin=dict(t=20, b=12, l=8, r=8),
         legend=dict(orientation="h", y=1.1, x=0),
     )
     fig.update_yaxes(range=[0, 1], showgrid=True, gridcolor="rgba(35,75,141,0.12)")
@@ -191,7 +441,7 @@ def _build_risk_chart(df):
 
 
 def _build_drivers_chart(alert_reasons):
-    """Gráfico profesional de causas/drivers del riesgo con colores degradados."""
+    """Grafico profesional de causas/drivers del riesgo con colores degradados."""
     chunks = [chunk.strip() for chunk in str(alert_reasons).split("|") if chunk.strip()]
     labels = []
     values = []
@@ -206,7 +456,7 @@ def _build_drivers_chart(alert_reasons):
         values = [5]
         colors_list = ["#059669"]  # Verde para estado estable
     else:
-        # Paleta de colores degradada: Rojo → Naranja → Amarillo
+        # Paleta de colores degradada: Rojo -> Naranja -> Amarillo
         if len(labels) == 1:
             colors_list = ["#DC1F26"]  # Rojo puro
         elif len(labels) == 2:
@@ -218,7 +468,7 @@ def _build_drivers_chart(alert_reasons):
         else:
             colors_list = ["#DC1F26", "#F59E0B", "#F97316", "#FB923C", "#FBBF24"]  # Rojo a Amarillo
 
-    # Invertir para que la causa más importante esté arriba
+    # Invertir para que la causa mas importante este arriba
     labels = labels[::-1]
     values = values[::-1]
     colors_list = colors_list[::-1]
@@ -285,20 +535,32 @@ def _build_drivers_chart(alert_reasons):
 
 
 def _render_risk_banner(risk_level, score):
-    if risk_level == "ALTO":
-        st.markdown(
-            f"""
-            <div class="home-legacy-risk-high">
-                <div><b>RIESGO ALTO</b></div>
-                <div>Score: {float(score):.2f}</div>
+    level = str(risk_level).upper()
+    strip_class = "train-strip-low"
+    icon_color = "#2ecc71"
+    label = "RIESGO BAJO"
+    if level == "MEDIO":
+        strip_class = "train-strip-medium"
+        icon_color = "#f39c12"
+        label = "RIESGO MEDIO"
+    elif level == "ALTO":
+        strip_class = "train-strip-high"
+        icon_color = "#e74c3c"
+        label = "RIESGO ALTO"
+
+    st.markdown(
+        f"""
+        <div class="train-status-strip {strip_class}">
+            <div class="train-status-strip-left">
+                {icon_chip("activity", icon_color, size=16, chip_size=30)}
+                <div class="train-status-text">{label}</div>
+                <div class="train-status-score"><span class="train-status-bullet">&bull;</span>Score: {float(score):.2f}</div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    elif risk_level == "MEDIO":
-        st.warning(f"RIESGO MEDIO - Score: {float(score):.2f}")
-    else:
-        st.info(f"RIESGO BAJO - Score: {float(score):.2f}")
+            <div style="color:#6A7891;font-size:16px;font-weight:700;line-height:1;">&#709;</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _extract_triggered_sensors(alert_reasons: str) -> list[str]:
@@ -395,7 +657,7 @@ def _render_sensor_popup_red(latest_alert: dict, score_operational: float) -> No
           <input id="{popup_id}" type="checkbox" class="sensor-popup-toggle" />
           <div class="sensor-popup-overlay"></div>
           <div class="sensor-popup-card">
-            <label class="sensor-popup-close" for="{popup_id}">×</label>
+            <label class="sensor-popup-close" for="{popup_id}">&times;</label>
             <div class="sensor-popup-title">ALERTA SENSOR ACTIVA ({level})</div>
             <div class="sensor-popup-copy">
               Sensores disparados: {safe_sensor_text}<br>
@@ -412,9 +674,12 @@ def _render_sensor_popup_red(latest_alert: dict, score_operational: float) -> No
 def render(df):
     _inject_css()
     inject_operational_ui()
+    inject_global_styles()
     working_df = df.copy().sort_values("timestamp")
     train_df, train_id, train_col = _selected_train_df(working_df)
+
     _render_header(train_id)
+
     latest = train_df.iloc[-1]
     risk_level = str(latest["risk_level"]).upper()
     score = float(latest["risk_score"])
@@ -426,6 +691,7 @@ def render(df):
     score_delta = float(latest_alert.get("risk_score_delta", score_operational - score))
     risk_level_display = str(latest_alert.get("alert_level", risk_level)).upper()
     _render_sensor_popup_red(latest_alert, score_operational)
+
     trend_direction_display = prediction["trend_direction"].upper()
     trend_detail = f"Triggers {int(latest_alert['alert_trigger_count'])}"
     if trend_direction_display == "ESTABLE" and risk_level_display == "ALTO":
@@ -435,28 +701,55 @@ def render(df):
         trend_direction_display = "SUBIENDO"
         trend_detail = f"Ajuste sensores {score_delta:+.3f}"
 
-    render_section_header("Estado Actual", "")
+    st.markdown(
+        """
+        <div class="train-state-heading">
+            <span class="train-state-dot"></span>
+            <h3 class="train-state-title">Estado Actual</h3>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     _render_risk_banner(risk_level_display, score_operational)
     if score_delta >= 0.03:
         st.warning(
-            f"AVISO OPERATIVO: el riesgo general subio de {score:.3f} a {score_operational:.3f} por severidad detectada en sensores/relaciones."
+            f"AVISO OPERATIVO: el riesgo general subió de {score:.3f} a {score_operational:.3f} por severidad detectada en sensores/relaciones."
         )
-    m1, m2, m3 = st.columns(3)
+
+    m1, m2, m3 = st.columns(3, gap="medium")
     with m1:
-        st.metric("Score de Riesgo Actual", f"{score_operational:.3f}", f"Ajuste {score_delta:+.3f}")
+        kpi_card(
+            "Score de Riesgo Actual",
+            f"{score_operational:.3f}",
+            f"Ajuste {score_delta:+.3f}",
+            icon="bar-chart",
+            color="#082A70",
+        )
     with m2:
-        st.metric("Proyección a 2 horas", f"{float(prediction['projected_score']):.3f}", prediction["projected_level"])
+        kpi_card(
+            "Proyección a 2 horas",
+            f"{float(prediction['projected_score']):.3f}",
+            prediction["projected_level"],
+            icon="clock",
+            color="#8e44ad",
+        )
     with m3:
-        st.metric("Tendencia del Riesgo", trend_direction_display, trend_detail)
+        kpi_card(
+            "Tendencia del Riesgo",
+            trend_direction_display,
+            trend_detail,
+            icon="activity",
+            color="#2ecc71",
+        )
 
-    render_section_header("Riesgo Operacional en el Tiempo", "")
-    st.plotly_chart(_build_risk_chart(alert_df), use_container_width=True)
+    section_title("Riesgo Operacional en el Tiempo", "")
+    chart_card("Evolución de riesgo operacional", _build_risk_chart(alert_df))
 
-    st.markdown("---")
-    render_section_header("Sensores Clave del Tren", "")
+    st.markdown('<div class="train-tight-divider"></div>', unsafe_allow_html=True)
+    section_title("Sensores Clave del Tren", "", extra_class="train-tight-section-head")
     ensure_sensor_chart_styles()
 
-    row1 = st.columns(4)
+    row1 = st.columns(4, gap="medium")
     with row1[0]:
         render_sensor_card("TP3_mean", train_df)
     with row1[1]:
@@ -466,7 +759,7 @@ def render(df):
     with row1[3]:
         render_sensor_card("Motor_Current_mean", train_df)
 
-    row2 = st.columns(3)
+    row2 = st.columns(3, gap="medium")
     with row2[0]:
         render_sensor_card("MPG_last", train_df)
     with row2[1]:
@@ -474,20 +767,21 @@ def render(df):
     with row2[2]:
         render_sensor_card("TOWERS_last", train_df)
 
-    st.markdown("---")
-    render_section_header("Señales Doradas del Tren", "")
+    st.markdown('<div class="train-tight-divider"></div>', unsafe_allow_html=True)
+    section_title("Señales Doradas del Tren", "", extra_class="train-tight-section-head")
     render_golden_signals(train_df, thresholds)
 
-    st.markdown("---")
-    render_financial_section(alert_df, prediction)
+    st.markdown('<div class="train-tight-divider"></div>', unsafe_allow_html=True)
+    render_financial_section(alert_df, prediction, compact_header=True)
 
     st.markdown("---")
-    render_section_header("Plan de Acción Recomendado", "")
-    render_operativity_panel(train_df)
-
-    st.markdown("---")
-    render_section_header("Historial de Eventos (Postmortem)", "Resumen de episodios relevantes para trazabilidad técnica.")
-    render_postmortem_panel(alert_df, prediction)
+    plan_col, history_col = st.columns([1, 1], gap="medium")
+    with plan_col:
+        section_title("Plan de Acción Recomendado", "")
+        render_operativity_panel(train_df)
+    with history_col:
+        section_title("Historial de Eventos (Postmortem)", "Resumen de episodios relevantes para trazabilidad técnica.")
+        render_postmortem_panel(alert_df, prediction, max_columns=1)
 
     if train_col:
         st.markdown("---")
@@ -496,3 +790,5 @@ def render(df):
             if st.button("Volver al Home General"):
                 st.session_state["nav_view"] = "system_home"
                 st.rerun()
+
+
