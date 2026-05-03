@@ -18,3 +18,8 @@ venv/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Archivos generados por el pipeline
+data/output/
+data/processed/
+logs/

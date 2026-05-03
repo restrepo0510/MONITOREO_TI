@@ -2,25 +2,10 @@ import pandas as pd
 from pathlib import Path
 
 
-# ======================================================
-# CONFIGURACIÓN
-# ======================================================
-
-# Ventana temporal seleccionada en el análisis
 WINDOW_SIZE = "5min"
-
-# Dataset generado por la etapa de ingesta
 INPUT_PATH = Path("data/processed/base.parquet")
-
-# Dataset de salida con las features generadas
 OUTPUT_PATH = Path("data/processed/features.parquet")
 
-
-# ======================================================
-# VARIABLES DEL DATASET
-# ======================================================
-
-# Sensores analógicos (valores continuos)
 ANALOG_SENSORS = [
     "TP2",
     "TP3",
@@ -28,57 +13,46 @@ ANALOG_SENSORS = [
     "DV_pressure",
     "Reservoirs",
     "Oil_Temperature",
-    "Motor_Current"
+    "Motor_Current",
 ]
 
-# Señales digitales (0 / 1)
 DIGITAL_SIGNALS = [
     "COMP",
-    "DV_eletric",
-    "Towers",
+    "DV_electric",
+    "TOWERS",
     "MPG",
     "LPS",
     "Pressure_switch",
-    "Oil_level",
-    "Caudal_impulses"
+    "Oil_Level",
+    "Caudal_impulses",
 ]
 
 
-# ======================================================
-# GENERAR FEATURES
-# ======================================================
+def _flatten_columns(columns):
+    flat = []
+    for col in columns:
+        if isinstance(col, tuple):
+            flat.append("_".join(str(part) for part in col if part))
+        else:
+            flat.append(str(col))
+    return flat
+
 
 def generate_features():
-
-    print("Cargando dataset base...")
-
+    print("Loading base dataset...")
     df = pd.read_parquet(INPUT_PATH)
 
-    print("Dataset cargado")
-    print("Registros:", len(df))
+    print(f"Rows: {len(df):,}")
+    print(f"Columns: {len(df.columns)}")
 
-    # ==================================================
-    # convertir timestamp a datetime
-    # ==================================================
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df = df.dropna(subset=["timestamp"]).set_index("timestamp").sort_index()
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-    # usar timestamp como índice temporal
-    df = df.set_index("timestamp")
-
-    # ==================================================
-    # definir agregaciones
-    # ==================================================
-
-    # agregaciones para sensores analógicos
     analog_aggs = ["mean", "std", "min", "max", "last"]
-
-    # agregaciones para señales digitales
     digital_aggs = ["mean", "sum", "last"]
 
     agg_dict = {}
 
-    # construir diccionario de agregaciones
     for col in ANALOG_SENSORS:
         if col in df.columns:
             agg_dict[col] = analog_aggs
@@ -87,187 +61,32 @@ def generate_features():
         if col in df.columns:
             agg_dict[col] = digital_aggs
 
-    # ==================================================
-    # crear ventanas temporales
-    # ==================================================
+    missing_analog = [c for c in ANALOG_SENSORS if c not in df.columns]
+    missing_digital = [c for c in DIGITAL_SIGNALS if c not in df.columns]
+    if missing_analog:
+        print("Missing analog sensors:", missing_analog)
+    if missing_digital:
+        print("Missing digital signals:", missing_digital)
 
-    print("Generando features por ventana:", WINDOW_SIZE)
+    if not agg_dict:
+        raise ValueError("No valid sensors found to aggregate.")
 
-    # agrupar datos en ventanas de 5 minutos
-    features = df.resample(WINDOW_SIZE).agg(agg_dict)
+    print(f"Generating features with window: {WINDOW_SIZE}")
+    features = df.resample(WINDOW_SIZE).agg(agg_dict).reset_index()
 
-    # ==================================================
-    # limpiar nombres de columnas
-    # ==================================================
+    features.columns = _flatten_columns(features.columns)
 
-    # multiindex -> nombre simple
-    features.columns = [
-        "_".join(col) for col in features.columns
-    ]
-
-    # ==================================================
-    # eliminar ventanas vacías
-    # ==================================================
-
-    # eliminar solo ventanas completamente vacías
-    features = features.dropna(how="all")
-
-    # ==================================================
-    # guardar resultado
-    # ==================================================
+    value_cols = [c for c in features.columns if c != "timestamp"]
+    features = features.dropna(subset=value_cols, how="all")
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    features.to_parquet(OUTPUT_PATH, index=False)
 
-    features.to_parquet(OUTPUT_PATH)
-
-    print("Features guardadas en:")
-    print(OUTPUT_PATH)
-
-    print("Shape final:", features.shape)
+    print(f"Features saved to: {OUTPUT_PATH}")
+    print(f"Final shape: {features.shape}")
 
     return features
 
-
-# ======================================================
-# EJECUCIÓN
-# ======================================================
-
-if __name__ == "__main__":
-    generate_features()
-
-import pandas as pd
-from pathlib import Path
-
-
-# ======================================================
-# CONFIGURACIÓN
-# ======================================================
-
-# Ventana temporal seleccionada en el análisis
-WINDOW_SIZE = "5min"
-
-# Dataset generado por la etapa de ingesta
-INPUT_PATH = Path("data/processed/base.parquet")
-
-# Dataset de salida con las features generadas
-OUTPUT_PATH = Path("data/processed/features.parquet")
-
-
-# ======================================================
-# VARIABLES DEL DATASET
-# ======================================================
-
-# Sensores analógicos (valores continuos)
-ANALOG_SENSORS = [
-    "TP2",
-    "TP3",
-    "H1",
-    "DV_pressure",
-    "Reservoirs",
-    "Oil_Temperature",
-    "Motor_Current"
-]
-
-# Señales digitales (0 / 1)
-DIGITAL_SIGNALS = [
-    "COMP",
-    "DV_eletric",
-    "Towers",
-    "MPG",
-    "LPS",
-    "Pressure_switch",
-    "Oil_level",
-    "Caudal_impulses"
-]
-
-
-# ======================================================
-# GENERAR FEATURES
-# ======================================================
-
-def generate_features():
-
-    print("Cargando dataset base...")
-
-    df = pd.read_parquet(INPUT_PATH)
-
-    print("Dataset cargado")
-    print("Registros:", len(df))
-
-    # ==================================================
-    # convertir timestamp a datetime
-    # ==================================================
-
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-    # usar timestamp como índice temporal
-    df = df.set_index("timestamp")
-
-    # ==================================================
-    # definir agregaciones
-    # ==================================================
-
-    # agregaciones para sensores analógicos
-    analog_aggs = ["mean", "std", "min", "max", "last"]
-
-    # agregaciones para señales digitales
-    digital_aggs = ["mean", "sum", "last"]
-
-    agg_dict = {}
-
-    # construir diccionario de agregaciones
-    for col in ANALOG_SENSORS:
-        if col in df.columns:
-            agg_dict[col] = analog_aggs
-
-    for col in DIGITAL_SIGNALS:
-        if col in df.columns:
-            agg_dict[col] = digital_aggs
-
-    # ==================================================
-    # crear ventanas temporales
-    # ==================================================
-
-    print("Generando features por ventana:", WINDOW_SIZE)
-
-    # agrupar datos en ventanas de 5 minutos
-    features = df.resample(WINDOW_SIZE).agg(agg_dict)
-
-    # ==================================================
-    # limpiar nombres de columnas
-    # ==================================================
-
-    # multiindex -> nombre simple
-    features.columns = [
-        "_".join(col) for col in features.columns
-    ]
-
-    # ==================================================
-    # eliminar ventanas vacías
-    # ==================================================
-
-    # eliminar solo ventanas completamente vacías
-    features = features.dropna(how="all")
-
-    # ==================================================
-    # guardar resultado
-    # ==================================================
-
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    features.to_parquet(OUTPUT_PATH)
-
-    print("Features guardadas en:")
-    print(OUTPUT_PATH)
-
-    print("Shape final:", features.shape)
-
-    return features
-
-
-# ======================================================
-# EJECUCIÓN
-# ======================================================
 
 if __name__ == "__main__":
     generate_features()

@@ -17,7 +17,9 @@ def run_pipeline():
     from src.ingesta.loader import DataLoader
     from src.preprocessing.feature_engineering import generate_features
     from src.analysis.risk_prediction import RiskPredictor
-    from src.dashboard.app import ModelOutputSaver
+    from src.dashboard.utils.sensor_thresholds import calibrate_sensor_thresholds, save_sensor_thresholds
+    from src.config import SENSOR_THRESHOLDS_PATH
+    from src.dashboard.model_output_saver import ModelOutputSaver
 
     print("\n===================================")
     print("INICIANDO PIPELINE DE MONITOREO")
@@ -51,9 +53,22 @@ def run_pipeline():
     print("3. Ejecutando modelo baseline...")
 
     predictor = RiskPredictor()
-    predictor.run()
+    risk_df = predictor.run()
 
     print("Predicción completada\n")
+
+    # ---------------------------------
+    # 3.5 UMBRALES FIJOS POR SENSOR
+    # ---------------------------------
+    # Se calibran con histórico sano (risk_level == BAJO) para alertamiento formal.
+    # Este artefacto es consumido por el front para mostrar referencias estables.
+    print("3.5 Calibrando umbrales fijos por sensor...")
+    if risk_df is not None:
+        thresholds = calibrate_sensor_thresholds(risk_df)
+        save_sensor_thresholds(thresholds, SENSOR_THRESHOLDS_PATH)
+        print(f"Umbrales guardados en: {SENSOR_THRESHOLDS_PATH}\n")
+    else:
+        print("No se pudo calibrar umbrales porque la predicción falló.\n")
 
     # ---------------------------------
     # 4. GUARDAR RESULTADOS

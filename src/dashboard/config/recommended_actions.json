@@ -1,0 +1,333 @@
+{
+  "version": 2,
+  "notes": "Politica operativa propuesta para el MVP, alineada con practicas publicas de operacion y mantenimiento de Metro do Porto y con la funcion de seguridad/disponibilidad del sistema neumatico APU.",
+  "default_responsable": "Operacion",
+  "default_canal": "panel",
+  "default_sla_min": 30,
+  "global_actions": {
+    "ALTO": [
+      {
+        "id": "G-ALTO-01",
+        "text": "Notificar de inmediato al Centro de control y confirmar por radio la unidad afectada, sentido de circulacion y hora del evento para evaluacion operacional inmediata.",
+        "responsable": "Centro de control",
+        "canal": "radio",
+        "sla_min": 2,
+        "priority": 1,
+        "direction": "any",
+        "when": "inmediato"
+      },
+      {
+        "id": "G-ALTO-02",
+        "text": "Mantener la unidad bajo vigilancia reforzada y programar retirada en la primera oportunidad operacional segura si la condicion persiste o si coincide con multiples sensores criticos.",
+        "responsable": "Centro de control",
+        "canal": "telefono",
+        "sla_min": 10,
+        "priority": 2,
+        "direction": "any",
+        "when": "inmediato"
+      }
+    ],
+    "MEDIO": [
+      {
+        "id": "G-MEDIO-01",
+        "text": "Registrar la alerta en el panel operativo y asignar revision en la proxima ventana operativa o paso por taller, sin afectar el servicio salvo degradacion adicional.",
+        "responsable": "Operacion",
+        "canal": "panel",
+        "sla_min": 30,
+        "priority": 20,
+        "direction": "any",
+        "when": "proxima_ventana"
+      },
+      {
+        "id": "G-MEDIO-02",
+        "text": "Escalar por correo a mantenimiento si el mismo patron se repite en dos o mas ciclos consecutivos o reaparece en la misma unidad durante la jornada.",
+        "responsable": "Operacion",
+        "canal": "correo",
+        "sla_min": 60,
+        "priority": 25,
+        "direction": "any",
+        "when": "proxima_ventana"
+      }
+    ],
+    "BAJO": [
+      {
+        "id": "G-BAJO-01",
+        "text": "Mantener monitoreo en panel y consolidar tendencia para analisis de rutina durante la siguiente inspeccion programada.",
+        "responsable": "Operacion",
+        "canal": "panel",
+        "sla_min": 60,
+        "priority": 100,
+        "direction": "any",
+        "when": "rutina"
+      }
+    ]
+  },
+  "sensor_actions": {
+    "TP3_mean": {
+      "ALTO": [
+        {
+          "id": "TP3-A-01",
+          "text": "Inspeccionar la presion generada en el panel neumatico y verificar posible fuga o incapacidad de la unidad para sostener presion de servicio; priorizar retirada segura si la caida es sostenida.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "radio",
+          "sla_min": 5,
+          "priority": 5,
+          "direction": "low",
+          "when": "inmediato"
+        }
+      ],
+      "MEDIO": [
+        {
+          "id": "TP3-M-01",
+          "text": "Revisar tendencia de presion del panel, confirmar recuperacion del sistema y programar inspeccion de linea neumatica, valvulas y posibles microfugas en la proxima ventana.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 45,
+          "priority": 30,
+          "direction": "low",
+          "when": "proxima_ventana"
+        }
+      ],
+      "BAJO": [
+        {
+          "id": "TP3-B-01",
+          "text": "Registrar desviacion leve de la presion del panel y seguir tendencia por unidad para mantenimiento preventivo de rutina.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 120,
+          "priority": 110,
+          "direction": "any",
+          "when": "rutina"
+        }
+      ]
+    },
+    "H1_mean": {
+      "ALTO": [
+        {
+          "id": "H1-A-01",
+          "text": "Verificar evento anormal de descarga en el separador ciclonico/filtro y revisar si existe obstruccion, descarga fuera de secuencia o perdida brusca asociada al sistema de separacion.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "radio",
+          "sla_min": 10,
+          "priority": 8,
+          "direction": "spike",
+          "when": "inmediato"
+        }
+      ],
+      "MEDIO": [
+        {
+          "id": "H1-M-01",
+          "text": "Inspeccionar comportamiento de H1 frente a descargas normales y programar revision del filtro separador y su secuencia de purga en la proxima ventana operativa.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "panel",
+          "sla_min": 60,
+          "priority": 35,
+          "direction": "spike",
+          "when": "proxima_ventana"
+        }
+      ],
+      "BAJO": [
+        {
+          "id": "H1-B-01",
+          "text": "Mantener seguimiento de variaciones leves de H1 para detectar deterioro progresivo del sistema de separacion.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 180,
+          "priority": 115,
+          "direction": "any",
+          "when": "rutina"
+        }
+      ]
+    },
+    "DV_pressure_mean": {
+      "ALTO": [
+        {
+          "id": "DV-A-01",
+          "text": "Comprobar de inmediato la descarga de las torres secadoras y la valvula de salida; si los picos o caidas son anormales, retirar para revision del secador y valvuleria asociada.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "radio",
+          "sla_min": 10,
+          "priority": 7,
+          "direction": "spike",
+          "when": "inmediato"
+        }
+      ],
+      "MEDIO": [
+        {
+          "id": "DV-M-01",
+          "text": "Revisar consistencia de las descargas del secador, frecuencia de purga y correlacion con Pressure Switch en la proxima ventana operativa.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "panel",
+          "sla_min": 60,
+          "priority": 40,
+          "direction": "any",
+          "when": "proxima_ventana"
+        }
+      ],
+      "BAJO": [
+        {
+          "id": "DV-B-01",
+          "text": "Registrar comportamiento leve fuera de patron en DV pressure para seguimiento de condicion del secador.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 180,
+          "priority": 120,
+          "direction": "any",
+          "when": "rutina"
+        }
+      ]
+    },
+    "Motor_Current_mean": {
+      "ALTO": [
+        {
+          "id": "MC-A-01",
+          "text": "Revisar sobrecorriente o ausencia anormal de consumo del motor del compresor; confirmar estado de carga, arranque y posible sobreesfuerzo mecanico antes de mantener la unidad en servicio.",
+          "responsable": "Mantenimiento electrico",
+          "canal": "radio",
+          "sla_min": 5,
+          "priority": 6,
+          "direction": "high",
+          "when": "inmediato"
+        }
+      ],
+      "MEDIO": [
+        {
+          "id": "MC-M-01",
+          "text": "Analizar ciclos de corriente fuera de rango esperado y programar revision de motor, arranque y regimen de carga del compresor en la proxima ventana.",
+          "responsable": "Mantenimiento electrico",
+          "canal": "panel",
+          "sla_min": 45,
+          "priority": 32,
+          "direction": "any",
+          "when": "proxima_ventana"
+        }
+      ],
+      "BAJO": [
+        {
+          "id": "MC-B-01",
+          "text": "Registrar deriva leve de corriente para seguimiento de eficiencia energetica y desgaste progresivo.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 180,
+          "priority": 118,
+          "direction": "any",
+          "when": "rutina"
+        }
+      ]
+    },
+    "MPG_last": {
+      "ALTO": [
+        {
+          "id": "MPG-A-01",
+          "text": "Verificar activacion del mando de arranque en carga por caida de presion; si queda activado de forma persistente, revisar demanda anormal de aire o incapacidad del compresor para recuperar presion.",
+          "responsable": "Centro de control",
+          "canal": "radio",
+          "sla_min": 5,
+          "priority": 9,
+          "direction": "state_change",
+          "when": "inmediato"
+        }
+      ],
+      "MEDIO": [
+        {
+          "id": "MPG-M-01",
+          "text": "Confirmar frecuencia de activacion de MPG y correlacionarla con TP3 y Motor Current para identificar sobreciclos del compresor en la proxima ventana.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 30,
+          "priority": 33,
+          "direction": "state_change",
+          "when": "proxima_ventana"
+        }
+      ],
+      "BAJO": [
+        {
+          "id": "MPG-B-01",
+          "text": "Registrar cambio de estado esporadico fuera del patron normal y mantener seguimiento de ciclos.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 120,
+          "priority": 119,
+          "direction": "state_change",
+          "when": "rutina"
+        }
+      ]
+    },
+    "Oil_Temperature_mean": {
+      "ALTO": [
+        {
+          "id": "OT-A-01",
+          "text": "Atender de inmediato temperatura elevada de aceite y revisar lubricacion, ventilacion y sobrecarga del compresor antes de prolongar la operacion.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "radio",
+          "sla_min": 10,
+          "priority": 10,
+          "direction": "high",
+          "when": "inmediato"
+        }
+      ],
+      "MEDIO": [
+        {
+          "id": "OT-M-01",
+          "text": "Programar revision de tendencia termica, calidad de lubricacion y regimen de carga del compresor en la proxima ventana operativa.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "panel",
+          "sla_min": 60,
+          "priority": 36,
+          "direction": "high",
+          "when": "proxima_ventana"
+        }
+      ],
+      "BAJO": [
+        {
+          "id": "OT-B-01",
+          "text": "Mantener seguimiento de aumento leve de temperatura para mantenimiento preventivo por condicion.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 180,
+          "priority": 121,
+          "direction": "high",
+          "when": "rutina"
+        }
+      ]
+    },
+    "TOWERS_last": {
+      "ALTO": [
+        {
+          "id": "TW-A-01",
+          "text": "Verificar de inmediato conmutacion anomala o ausencia de cambio en las torres secadoras, por posible fallo del sistema de secado y drenaje de humedad.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "radio",
+          "sla_min": 10,
+          "priority": 11,
+          "direction": "state_change",
+          "when": "inmediato"
+        }
+      ],
+      "MEDIO": [
+        {
+          "id": "TW-M-01",
+          "text": "Revisar patron de alternancia de torres y programar inspeccion del secador y elementos de purga en la proxima ventana operativa.",
+          "responsable": "Mantenimiento mecanico",
+          "canal": "panel",
+          "sla_min": 60,
+          "priority": 38,
+          "direction": "state_change",
+          "when": "proxima_ventana"
+        }
+      ],
+      "BAJO": [
+        {
+          "id": "TW-B-01",
+          "text": "Registrar desviacion leve del patron de conmutacion para seguimiento del sistema de secado.",
+          "responsable": "Operacion",
+          "canal": "panel",
+          "sla_min": 180,
+          "priority": 122,
+          "direction": "state_change",
+          "when": "rutina"
+        }
+      ]
+    }
+  }
+}

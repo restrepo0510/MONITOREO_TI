@@ -21,13 +21,13 @@ class DataLoader:
     para que los siguientes módulos (preprocessing y modelo)
     trabajen sin errores estructurales.
     """
+    # Importar configuración central
+    from src.config import DATA_RAW_PATH, DATA_BASE_PATH, LOG_DIR
 
-    def __init__(
-        self,
-        file_path="data/raw/MetroPT3(AirCompressor).csv",
-        output_path="data/processed/base.parquet",
-        log_dir="logs",
-    ):
+    def __init__(self,
+             file_path=DATA_RAW_PATH,
+             output_path=DATA_BASE_PATH,
+             log_dir=LOG_DIR):
         # Ruta del archivo crudo que se desea cargar
         self.file_path = file_path
 
