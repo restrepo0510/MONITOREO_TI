@@ -10,6 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from src.dashboard.theme_manager import inject_theme_css
 from src.dashboard.cache_manager import invalidate_all_caches
 from src.dashboard.data_loader import load_scores
+from src.dashboard.login_view import render_auth_sidebar, require_login
 from src.dashboard.views.ui_kit import inject_custom_css
 from src.dashboard.views import (
     alerts,
@@ -35,6 +36,9 @@ st.set_page_config(
 # Inyectar estilos UNA SOLA VEZ (NO en cada render)
 inject_theme_css()
 inject_custom_css()
+
+if not require_login():
+    st.stop()
 
 
 # ============================================================================
@@ -155,6 +159,8 @@ with st.sidebar:
         """,
         unsafe_allow_html=True,
     )
+    st.markdown("---")
+    render_auth_sidebar()
     st.markdown("---")
 
     if "nav_view" not in st.session_state:

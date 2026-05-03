@@ -9,6 +9,7 @@ logs/
 
 # Outputs temporales
 outputs/
+tmp/
 
 # Python
 __pycache__/
