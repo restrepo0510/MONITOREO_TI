@@ -1,12 +1,37 @@
 from __future__ import annotations
 
+from urllib.parse import quote
+
 import streamlit as st
+
+
+def _metro_cursor_data_uri() -> str:
+    svg = """
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+      <defs>
+        <linearGradient id="g" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#FFE600"/>
+          <stop offset="0.42" stop-color="#F6C50E"/>
+          <stop offset="1" stop-color="#082A70"/>
+        </linearGradient>
+      </defs>
+      <path d="M24 4C15.2 4 9 10.1 9 19v9.6C9 36.3 15.5 43 24 43s15-6.7 15-14.4V19C39 10.1 32.8 4 24 4Z" fill="url(#g)" stroke="#050505" stroke-width="2"/>
+      <path d="M14 18c.7-5.1 4.4-8.2 10-8.2s9.3 3.1 10 8.2H14Z" fill="#F9F8F8" stroke="#050505" stroke-width="1.5"/>
+      <path d="M14 21h20v8H14z" fill="#102A44" stroke="#050505" stroke-width="1.4"/>
+      <path d="M17.2 29.5h13.6" stroke="#B8DBD9" stroke-width="1.7" stroke-linecap="round"/>
+      <circle cx="17.2" cy="34.8" r="2.6" fill="#F9F8F8" stroke="#050505" stroke-width="1"/>
+      <circle cx="30.8" cy="34.8" r="2.6" fill="#F9F8F8" stroke="#050505" stroke-width="1"/>
+      <path d="M20.4 16.6c0-1.3.9-2.2 2.1-2.2s2.1.9 2.1 2.2v1.7c0 .9.7 1.6 1.6 1.6s1.6-.7 1.6-1.6v-3.7" fill="none" stroke="#082A70" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M7 7l9 4-7 4Z" fill="#050505"/>
+    </svg>
+    """
+    return f"data:image/svg+xml,{quote(svg.strip())}"
 
 
 def inject_custom_css(force: bool = False) -> None:
     """Inyecta el sistema visual global del dashboard."""
-    st.markdown(
-        """
+    cursor_uri = _metro_cursor_data_uri()
+    css = """
         <style>
         :root {
             --mt-blue: #082A70;
@@ -22,6 +47,10 @@ def inject_custom_css(force: bool = False) -> None:
             --mt-radius-xl: 28px;
             --mt-radius-lg: 24px;
             --mt-radius-md: 16px;
+        }
+
+        * {
+            cursor: url("CURSOR_URI") 8 8, auto !important;
         }
 
         [data-testid="stAppViewContainer"] {
@@ -247,9 +276,9 @@ def inject_custom_css(force: bool = False) -> None:
             }
         }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
+        """
+    css = css.replace("CURSOR_URI", cursor_uri)
+    st.markdown(css, unsafe_allow_html=True)
 
 
 def inject_operational_ui() -> None:

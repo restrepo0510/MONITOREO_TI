@@ -338,51 +338,259 @@ def _selected_train_df(df):
 
 def _render_header(train_id: str):
     paths = _image_paths()
-    c1, c2, c3 = st.columns([3.8, 3.2, 3.0], gap="medium", vertical_alignment="top")
+    safe_train_id = html.escape(str(train_id))
 
-    with c1:
-        safe_train_id = html.escape(str(train_id))
-        st.markdown(
-            f"""
-            <div class="train-hero-heading">
-                <div class="train-hero-title">APU DEL TREN #{safe_train_id}</div>
-                <div class="train-hero-status">(Operativo)</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    train_image = ""
+    train_src = ""
+    if paths["train"].exists():
+        encoded_train = base64.b64encode(paths["train"].read_bytes()).decode("ascii")
+        train_src = f"data:image/png;base64,{encoded_train}"
+        train_image = f'<img class="train-banner-icon" src="{train_src}" alt="Tren APU {safe_train_id}" />'
+
+    stations = [
+        ("Trindade", "#FFE600"),
+        ("Bolhao", "#B8DBD9"),
+        ("Aliados", "#FFFFFF"),
+        ("Campanha", "#F6C50E"),
+        ("Casa da Musica", "#DDE7FF"),
+        ("Sao Bento", "#D9F99D"),
+    ]
+    station_cards = ""
+    if train_src:
+        station_cards = "".join(
+            f'<div class="train-station-card" style="--station-bg:{color}">'
+            f'<img src="{train_src}" alt="Metro do Porto en {html.escape(name)}" />'
+            f"<span>{html.escape(name)}</span>"
+            "</div>"
+            for name, color in stations + stations
         )
 
-    with c2:
-        st.markdown(
-            """
-            <div class="train-route-wrap">
-                <div class="train-route-shell">
-                    <div class="train-route-track">
-                        <span class="train-route-stop">Parque inicial</span>
-                        <span class="train-route-arrow">&rarr;</span>
-                        <span class="train-route-stop active">Camino de mantenimiento</span>
-                        <span class="train-route-arrow">&rarr;</span>
-                        <span class="train-route-stop">Mantenimiento salida</span>
-                    </div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        f"""
+        <style>
+        .train-operational-banner {{
+            position: relative;
+            overflow: hidden;
+            min-height: 430px;
+            border: 3px solid #050505;
+            border-radius: 30px;
+            background:
+                radial-gradient(circle at 78% 18%, rgba(255, 230, 0, 0.24), transparent 24%),
+                linear-gradient(135deg, #082A70 0%, #061F54 100%);
+            box-shadow: 14px 14px 0 #050505;
+            margin-bottom: 2rem;
+            padding: 2rem 2rem 1.15rem;
+            isolation: isolate;
+        }}
 
-    with c3:
-        if paths["train"].exists():
-            encoded_train = base64.b64encode(paths["train"].read_bytes()).decode("ascii")
-            st.markdown(
-                f'''
-                <div class="train-header-right">
-                    <img class="train-header-image" src="data:image/png;base64,{encoded_train}" alt="Tren APU {safe_train_id}" />
+        .train-operational-banner::before {{
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+            background-size: 34px 34px;
+            opacity: 0.55;
+            z-index: 1;
+        }}
+
+        .train-operational-banner::after {{
+            content: "";
+            position: absolute;
+            right: -42px;
+            bottom: -70px;
+            width: 380px;
+            height: 180px;
+            border: 3px solid rgba(255, 230, 0, 0.82);
+            border-radius: 999px;
+            transform: rotate(-9deg);
+            z-index: 1;
+        }}
+
+        .train-operational-content {{
+            position: relative;
+            z-index: 3;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+        }}
+
+        .train-operational-left {{
+            flex: 1;
+            min-width: 0;
+        }}
+
+        .train-operational-title {{
+            font-family: Arial Black, Impact, sans-serif;
+            font-size: clamp(4rem, 2vw, 6rem) !important;
+            font-weight: 900;
+            line-height: 0.86;
+            color: #FFFFFF !important;
+            margin: 0;
+            letter-spacing: 0;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
+            max-width: 620px;
+        }}
+
+        .train-operational-subtitle {{
+            display: none;
+            font-size: 1.2rem;
+            font-weight: 950;
+            color: #FFE600;
+            margin: 0.9rem 0 0 0;
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3);
+        }}
+
+        .train-banner-icon {{
+            width: min(34vw, 360px);
+            height: auto;
+            filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.38));
+            transform: rotate(-2deg);
+        }}
+
+        .train-station-strip {{
+            position: relative;
+            z-index: 4;
+            overflow: hidden;
+            margin-top: 1.5rem;
+            min-height: 146px;
+            padding: 0.15rem 0 0.75rem;
+            -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%);
+        }}
+
+        .train-station-track {{
+            display: flex;
+            width: max-content;
+            gap: 0.85rem;
+            animation: train-station-loop 19s linear infinite;
+        }}
+
+        .train-station-card {{
+            position: relative;
+            flex: 0 0 auto;
+            width: 184px;
+            height: 128px;
+            overflow: hidden;
+            border: 2px solid #050505;
+            border-radius: 20px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 58%),
+                var(--station-bg, #FFFFFF);
+            box-shadow: 5px 5px 0 #050505;
+        }}
+
+        .train-station-card img {{
+            position: absolute;
+            width: 190px;
+            left: -26px;
+            bottom: 20px;
+            filter: drop-shadow(0 10px 7px rgba(0, 0, 0, 0.26));
+        }}
+
+        .train-station-card span {{
+            position: absolute;
+            left: 10px;
+            bottom: 9px;
+            max-width: calc(100% - 20px);
+            background: #FFFFFF;
+            border: 1.8px solid #050505;
+            border-radius: 999px;
+            padding: 0.24rem 0.48rem;
+            color: #050505;
+            font-size: 0.7rem;
+            font-weight: 900;
+            line-height: 1.1;
+            white-space: normal;
+        }}
+
+        .train-station-note {{
+            position: absolute;
+            right: 1.4rem;
+            top: 1.25rem;
+            z-index: 5;
+            display: inline-flex;
+            align-items: center;
+            min-height: 36px;
+            border: 2px solid #050505;
+            border-radius: 999px;
+            background: #FFE600;
+            color: #050505;
+            padding: 0.42rem 0.8rem;
+            font-size: 0.78rem;
+            font-weight: 950;
+            box-shadow: 4px 4px 0 #050505;
+        }}
+
+        @keyframes train-station-loop {{
+            from {{ transform: translateX(0); }}
+            to {{ transform: translateX(-50%); }}
+        }}
+
+        @media (max-width: 1024px) {{
+            .train-banner-icon {{
+                width: 260px;
+            }}
+        }}
+
+        @media (max-width: 760px) {{
+            .train-operational-banner {{
+                min-height: auto;
+                padding: 1.2rem 1rem 0.75rem;
+                border-radius: 24px;
+                box-shadow: 7px 7px 0 #050505;
+            }}
+
+            .train-operational-content {{
+                flex-direction: column;
+                text-align: center;
+                gap: 1rem;
+            }}
+
+            .train-operational-title {{
+                font-size: 3.25rem;
+            }}
+
+            .train-banner-icon {{
+                width: min(76vw, 280px);
+            }}
+
+            .train-station-note {{
+                position: relative;
+                right: auto;
+                top: auto;
+                margin-bottom: 0.8rem;
+            }}
+
+            .train-station-strip {{
+                min-height: 124px;
+                margin-top: 0.95rem;
+            }}
+
+            .train-station-card {{
+                width: 156px;
+                height: 112px;
+            }}
+        }}
+        </style>
+        <div class="train-operational-banner">
+            <div class="train-station-note">Ruta en monitoreo</div>
+            <div class="train-operational-content">
+                <div class="train-operational-left">
+                    <h1 class="train-operational-title">Vista<br>Operativo<br>Del Tren</h1>
                 </div>
-                ''',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.caption("Imagen de tren no encontrada")
+                {train_image}
+            </div>
+            <div class="train-station-strip" aria-label="Carrusel de estaciones Metro do Porto">
+                <div class="train-station-track">{station_cards}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def _build_risk_chart(df):
     risk_df = df.tail(500).copy()
