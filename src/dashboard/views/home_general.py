@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -18,6 +20,8 @@ from src.dashboard.components.ui_kit import (
 )
 from src.dashboard.theme import RISK_THRESHOLDS
 from src.dashboard.utils.alert_engine import evaluate_alerts, resolve_alert_thresholds
+
+VIDEO_DIR = Path(__file__).resolve().parent.parent / "assets" / "videos"
 
 SENSOR_COLUMNS = [
     "TP3_mean",
@@ -160,6 +164,137 @@ def _drivers_summary(alert_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).head(8)
 
 
+@st.cache_data(show_spinner=False)
+def _video_data_uri(filename: str) -> str:
+    path = VIDEO_DIR / filename
+    data = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:video/mp4;base64,{data}"
+
+
+def _render_home_banner() -> None:
+    video_uri = _video_data_uri("home_banner.mp4")
+    st.markdown(
+        f"""
+        <style>
+        .home-banner {{
+            position: relative;
+            overflow: hidden;
+            min-height: 420px;
+            border: 3px solid #050505;
+            border-radius: 30px;
+            background: #FFFFFF;
+            box-shadow: 14px 14px 0 #050505;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }}
+
+        .home-banner-left {{
+            display: none;
+        }}
+
+        .home-banner-right {{
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }}
+
+        .home-video-container {{
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            height: 340px;
+            border: 3px solid #050505;
+            border-radius: 26px;
+            overflow: hidden;
+            background: #050505;
+            box-shadow: 8px 8px 0 #050505;
+        }}
+
+        .home-video-player {{
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border: none;
+        }}
+
+        .home-video-overlay {{
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, rgba(255, 230, 0, 0.16) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.10) 1px, transparent 1px),
+                radial-gradient(circle at 50% 42%, rgba(255, 230, 0, 0.2), transparent 46%);
+            background-size: 30px 30px, 30px 30px, cover;
+            pointer-events: none;
+            z-index: 2;
+        }}
+
+        @media (max-width: 1100px) {{
+            .home-banner {{
+                flex-direction: column;
+                min-height: auto;
+                padding: 1.5rem;
+            }}
+
+            .home-banner-title {{
+                font-size: 3.2rem;
+            }}
+
+            .home-video-container {{
+                max-width: 100%;
+            }}
+        }}
+
+        @media (max-width: 760px) {{
+            .home-banner {{
+                padding: 1.2rem;
+                margin-bottom: 1.5rem;
+            }}
+
+            .home-banner-title {{
+                font-size: 2.4rem;
+            }}
+
+            .home-banner-subtitle {{
+                font-size: 1rem;
+            }}
+        }}
+        </style>
+        <div class="home-banner">
+            <div class="home-banner-left">
+                <h1 class="home-banner-title">Vista Principal</h1>
+                <p class="home-banner-subtitle"></p>
+            </div>
+            <div class="home-banner-right">
+                <div class="home-video-container">
+                    <video
+                        class="home-video-player"
+                        autoplay
+                        muted
+                        loop
+                        playsinline
+                        preload="auto"
+                    >
+                        <source src="{video_uri}" type="video/mp4">
+                        Tu navegador no soporta video HTML5.
+                    </video>
+                    <div class="home-video-overlay"></div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render(_df: pd.DataFrame) -> None:
     df = _df.copy().sort_values("timestamp")
     thresholds, _ = resolve_alert_thresholds(df)
@@ -168,6 +303,8 @@ def render(_df: pd.DataFrame) -> None:
         alert_df = pd.DataFrame()
     df, train_col = _with_train_id(df)
     latest_trains = _latest_per_train(df, train_col)
+
+    _render_home_banner()
 
     latest_ts = pd.to_datetime(df["timestamp"].iloc[-1]) if "timestamp" in df.columns and not df.empty else None
     updated_label = latest_ts.strftime("Última actualización: %H:%M:%S") if latest_ts is not None else "Sin timestamp"
@@ -228,7 +365,7 @@ def render(_df: pd.DataFrame) -> None:
 
     section_title(
         "Riesgo Operacional Global",
-        "Comportamiento del riesgo agregado y cantidad de ventanas cr?ticas.",
+        "Comportamiento del riesgo agregado y cantidad de ventanas críticas.",
     )
     c1, c2 = st.columns([1, 2], gap="medium")
     critical_windows = int((alert_df["alert_level"] == "ALTO").sum()) if "alert_level" in alert_df.columns else 0
