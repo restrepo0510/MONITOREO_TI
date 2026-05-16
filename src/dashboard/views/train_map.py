@@ -437,10 +437,10 @@ def _build_animated_combined_figure(df: pd.DataFrame) -> go.Figure:
     }]
 
     fig.update_layout(
-        height=520,
+        height=500,
         plot_bgcolor="rgba(248,250,252,1)",
         paper_bgcolor="rgba(255,255,255,0)",
-        margin=dict(l=10, r=20, t=20, b=175),
+        margin=dict(l=10, r=20, t=20, b=130),
         legend=dict(
             orientation="h", x=0.5, xanchor="center", y=1.02,
             bgcolor="rgba(0,0,0,0)", font=dict(size=10),
@@ -463,7 +463,7 @@ def _build_animated_combined_figure(df: pd.DataFrame) -> go.Figure:
                     dict(label="⏸ Pausa", method="animate", args=pause_args),
                 ],
                 direction="left", pad=dict(r=6, t=5), showactive=True,
-                x=0.0, y=-0.32, xanchor="left", yanchor="top",
+                x=0.0, y=-0.21, xanchor="left", yanchor="top",
                 bgcolor="#082A70", bordercolor="#0A35A0",
                 font=dict(color="white", size=13),
             ),
@@ -478,7 +478,7 @@ def _build_animated_combined_figure(df: pd.DataFrame) -> go.Figure:
                     dict(label="20×", method="animate", args=_anim_args(50)),
                 ],
                 direction="left", pad=dict(r=6, t=5), showactive=True, active=1,
-                x=0.40, y=-0.32, xanchor="left", yanchor="top",
+                x=0.40, y=-0.21, xanchor="left", yanchor="top",
                 bgcolor="#374151", bordercolor="#4B5563",
                 font=dict(color="white", size=11),
             ),
@@ -490,7 +490,7 @@ def _build_animated_combined_figure(df: pd.DataFrame) -> go.Figure:
                 font=dict(size=10, color="#374151"),
             ),
             pad=dict(b=8, t=5),
-            len=1.0, x=0.0, y=-0.08,
+            len=1.0, x=0.0, y=-0.12,
             steps=[
                 dict(
                     method="animate",
@@ -572,27 +572,6 @@ def _animation_fragment(df: pd.DataFrame, total: int) -> None:
             st.session_state[anim_key] = _build_animated_combined_figure(df)
 
     combined_fig = st.session_state[anim_key]
-
-    # Corregir hover blanco en botones de Plotly.
-    # Plotly aplica Color.contrast() vía .style('fill', ...) en el hover,
-    # que devuelve blanco para fondos oscuros. !important en hoja de estilos
-    # tiene precedencia sobre .style() inline.
-    st.markdown(
-        """
-        <style>
-        .js-plotly-plot svg g.updatemenu-item:hover rect.updatemenu-item-rect {
-            fill: #1E40AF !important;
-        }
-        .js-plotly-plot svg g.updatemenu-item:hover text.updatemenu-item-text {
-            fill: #FFFFFF !important;
-        }
-        .js-plotly-plot svg g.updatemenu-item-active rect.updatemenu-item-rect {
-            fill: #1D4ED8 !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
     # ── Renderizar la figura animada ─────────────────────────────────────────
     # Plotly gestiona la reproducción completamente en JavaScript:
