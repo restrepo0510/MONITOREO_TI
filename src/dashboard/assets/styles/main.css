@@ -63,3 +63,33 @@ hr {
   color: var(--steel-azure);
   border: none;
 }
+
+/* Fix: input text invisible (white-on-white) when Streamlit dark theme + light CSS override */
+div[data-baseweb="input"] input,
+div[data-baseweb="input"] textarea,
+[data-testid="stNumberInput"] input {
+  color: #121212 !important;
+  background: transparent !important;
+}
+
+div[data-baseweb="input"] > div,
+div[data-baseweb="select"] > div {
+  background: #FFFFFF !important;
+  color: #121212 !important;
+}
+
+[data-testid="stNumberInput"] button {
+  background: var(--steel-azure) !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  border-radius: 8px !important;
+}
+
+[data-testid="stNumberInput"] button:hover {
+  background: #1a3870 !important;
+}
+
+[data-testid="stNumberInput"] button svg {
+  fill: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}

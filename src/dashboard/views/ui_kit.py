@@ -168,6 +168,61 @@ def inject_custom_css(force: bool = False) -> None:
             border-radius: 14px !important;
             border-color: var(--mt-border) !important;
             background: #FFFFFF !important;
+            color: var(--mt-text) !important;
+        }
+
+        div[data-baseweb="input"] input,
+        div[data-baseweb="input"] textarea,
+        div[data-baseweb="select"] input,
+        [data-testid="stNumberInput"] input {
+            color: var(--mt-text) !important;
+            background: transparent !important;
+            caret-color: var(--mt-blue) !important;
+        }
+
+        div[data-baseweb="select"] [data-testid="stMarkdownContainer"],
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] div[class] {
+            color: var(--mt-text) !important;
+        }
+
+        [data-testid="stNumberInput"] button,
+        [data-testid="stNumberInput"] [data-testid="baseButton-secondary"] {
+            background: var(--mt-blue) !important;
+            color: #FFFFFF !important;
+            border: none !important;
+            border-radius: 8px !important;
+            min-width: 32px !important;
+            min-height: 32px !important;
+        }
+
+        [data-testid="stNumberInput"] button:hover,
+        [data-testid="stNumberInput"] [data-testid="baseButton-secondary"]:hover {
+            background: #173A73 !important;
+            color: #FFFFFF !important;
+        }
+
+        [data-testid="stNumberInput"] button svg,
+        [data-testid="stNumberInput"] [data-testid="baseButton-secondary"] svg {
+            fill: #FFFFFF !important;
+            stroke: #FFFFFF !important;
+        }
+
+        .stTextInput > div > div,
+        .stSelectbox > div > div,
+        .stNumberInput > div > div {
+            background: #FFFFFF !important;
+            color: var(--mt-text) !important;
+        }
+
+        .stTextInput label,
+        .stSelectbox label,
+        .stNumberInput label,
+        .stSlider label,
+        .stCheckbox label,
+        .stRadio label {
+            color: var(--mt-text) !important;
+            font-weight: 600;
         }
 
         .mt-main-title {

@@ -13,11 +13,9 @@ from src.dashboard.data_loader import load_scores
 from src.dashboard.login_view import render_auth_sidebar, require_login
 from src.dashboard.views.ui_kit import inject_custom_css
 from src.dashboard.views import (
-    alerts,
     home_legacy_operational,
     home_general,
     manual_test,
-    train_details,
     train_map,
 )
 
@@ -53,15 +51,7 @@ NAV_SECTIONS = {
             ("system_home", "Home General"),
             ("train_operational", "Vista Tren (Operativa)"),
             ("train_map", "Mapa de Tren"),
-            ("alerts", "Alertas"),
             ("sandbox", "Prueba Manual"),
-        ],
-    },
-    "secondary": {
-        "title": "VISTAS SECUNDARIAS",
-        "question": "Decision y diagnostico",
-        "items": [
-            ("detail", "Detalle de Señales"),
         ],
     },
 }
@@ -178,7 +168,7 @@ with st.sidebar:
         st.markdown("")
 
     view_key = st.session_state.get("nav_view", "system_home")
-    valid_views = {"system_home", "train_operational", "train_map", "alerts", "sandbox", "detail"}
+    valid_views = {"system_home", "train_operational", "train_map", "sandbox"}
     if view_key not in valid_views:
         st.session_state["nav_view"] = "system_home"
         st.rerun()
@@ -237,10 +227,6 @@ try:
         train_module.render(df)
     elif view_key == "train_map":
         train_map.render(df)
-    elif view_key == "detail":
-        train_details.render(df)
-    elif view_key == "alerts":
-        alerts.render(df)
     elif view_key == "sandbox":
         manual_test.render(real_df)
 

@@ -222,10 +222,19 @@ def render(base_df: pd.DataFrame) -> None:
     render_level_badge(current_level, _safe_float(st.session_state[INPUT_KEYS["risk_score"]], 0.20))
 
     if enabled:
-        st.success("Sandbox activado: el dashboard usa la tabla simulada.")
+        st.markdown(
+        "<div style='background-color:#d4edda;padding:10px;border-radius:6px;color:black;'>"
+        "Sandbox activado: el dashboard usa la tabla simulada."
+        "</div>",
+        unsafe_allow_html=True
+    )
     else:
-        st.warning("Sandbox desactivado: el dashboard usa datos reales.")
-
+        st.markdown(
+        "<div style='background-color:#fff3cd;padding:10px;border-radius:6px;color:black;'>"
+        "Sandbox desactivado: el dashboard usa datos reales."
+        "</div>",
+        unsafe_allow_html=True
+    )
     render_section_header("Configuración de Entrada Manual", "Edita variables operativas y agrega nuevas filas simuladas.")
 
     t1, t2 = st.columns([1.2, 2.2])
@@ -348,8 +357,21 @@ def render(base_df: pd.DataFrame) -> None:
         st.metric("Proyección 2h", pred_after["projected_level"], pred_after["trend_direction"].upper())
 
     if (after_score - after_raw) >= 0.03:
-        st.warning(
-            f"Aviso de acople: score base {after_raw:.3f} -> score operativo {after_score:.3f} por severidad en sensores/relaciones."
+
+        st.markdown(
+            f"""
+            <div style="
+                background-color:#fff3cd;
+                padding:10px;
+                border-radius:6px;
+                color:black;
+                border-left:6px solid #f0ad4e;
+                font-size:0.95rem;">
+            Aviso de acople: score base {after_raw:.3f} -> score operativo {after_score:.3f} 
+            por severidad en sensores/relaciones.
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
     before_reasons = set(_split_reasons(str(latest_before.get("alert_reasons", ""))))
