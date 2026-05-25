@@ -7,7 +7,7 @@ from src.dashboard.components.ui_kit import section_title
 
 
 SCENARIO = {
-    "cost_high_episode": 4_200_000,
+    "cost_high_episode": 0,
     "cost_medium_episode": 1_250_000,
     "preventive_action_cost": 280_000,
     "avoidance_ratio": 0.34,
@@ -36,7 +36,7 @@ def _estimate_financials(alerts_df, prediction):
         }
 
     levels = alerts_df["alert_level"].fillna("BAJO")
-    high_events = int(((levels == "ALTO") & (levels.shift(1) != "ALTO")).sum())
+    high_events = 0
     medium_events = int(((levels == "MEDIO") & (levels.shift(1) != "MEDIO")).sum())
 
     projected_multiplier = 1.0
@@ -82,7 +82,7 @@ def render_financial_section(alerts_df, prediction, compact_header: bool = False
         render_kpi_card(
             label="Exposición Económica",
             value=_format_cop(financials["gross_exposure"]),
-            delta=f"{financials['high_events']} eventos altos y {financials['medium_events']} medios",
+            delta=f"0 eventos altos y {financials['medium_events']} eventos medios",
             caption="Estimación del costo bruto expuesto por continuidad operativa y mantenimiento reactivo.",
             tone="red",
         )

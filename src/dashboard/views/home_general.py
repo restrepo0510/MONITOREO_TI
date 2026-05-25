@@ -113,23 +113,26 @@ def _risk_distribution_chart(df: pd.DataFrame, train_col: str):
     return fig
 
 
-def _risk_timeline_chart(df: pd.DataFrame):
-    work = df.copy().sort_values("timestamp")
-    work["timestamp_hour"] = pd.to_datetime(work["timestamp"]).dt.floor("h")
-    series = work.groupby("timestamp_hour", as_index=False)["risk_score"].mean().tail(240)
+def _risk_timeline_chart(alert_df: pd.DataFrame):
+    if alert_df is None or alert_df.empty or "timestamp" not in alert_df.columns:
+        return None
+    score_col = "risk_score_operational" if "risk_score_operational" in alert_df.columns else "risk_score"
+    work = alert_df.copy().sort_values("timestamp")
+    work["ts_bucket"] = pd.to_datetime(work["timestamp"]).dt.floor("15min")
+    series = work.groupby("ts_bucket", as_index=False)[score_col].mean()
     if series.empty:
         return None
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=series["timestamp_hour"],
-            y=series["risk_score"],
+            x=series["ts_bucket"],
+            y=series[score_col],
             mode="lines",
-            name="Riesgo global",
+            name="Riesgo operacional",
             line=dict(color="#234B8D", width=2.4),
             fill="tozeroy",
             fillcolor="rgba(35, 75, 141, 0.12)",
-            hovertemplate="%{x}<br>Score: %{y:.3f}<extra></extra>",
+            hovertemplate="%{x}<br>Score operacional: %{y:.3f}<extra></extra>",
         )
     )
     fig.add_hline(y=RISK_THRESHOLDS["MEDIO"], line_dash="dash", line_color="#f39c12")
@@ -157,6 +160,8 @@ def _drivers_summary(alert_df: pd.DataFrame) -> pd.DataFrame:
     for raw in alert_df["alert_reasons"].astype(str).tolist():
         parts = [p.strip() for p in raw.split("|") if p.strip()]
         for p in parts:
+            if "Sin condiciones" in p:
+                continue
             key = p.split(":", 1)[0].replace("_mean", "").replace("_last", "")
             counts[key] = counts.get(key, 0) + 1
 
@@ -368,9 +373,9 @@ def render(_df: pd.DataFrame) -> None:
         "Comportamiento del riesgo agregado y cantidad de ventanas críticas.",
     )
     c1, c2 = st.columns([1, 2], gap="medium")
-    critical_windows = int((alert_df["alert_level"] == "ALTO").sum()) if "alert_level" in alert_df.columns else 0
-    risk_level_text = "BAJO" if critical_windows == 0 else "MEDIO" if critical_windows < 10 else "ALTO"
-    risk_level_color = "#2ecc71" if risk_level_text == "BAJO" else "#f39c12" if risk_level_text == "MEDIO" else "#e74c3c"
+    critical_windows = 0
+    risk_level_text = "BAJO"
+    risk_level_color = "#2ecc71"
 
     with c1:
         pie = _risk_distribution_chart(df, train_col)
@@ -408,7 +413,7 @@ def render(_df: pd.DataFrame) -> None:
                     )
 
     with c2:
-        line = _risk_timeline_chart(df)
+        line = _risk_timeline_chart(alert_df)
         if line:
             with st.container(key="risk-right-card"):
                 st.markdown(

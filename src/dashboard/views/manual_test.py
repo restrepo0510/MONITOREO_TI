@@ -305,18 +305,22 @@ def render(base_df: pd.DataFrame) -> None:
     render_section_header("Métricas Clave de Simulación", "Resumen rápido del volumen de datos reales y simulados.")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.metric("Filas reales", len(base_df))
-    with c2:
-        st.metric("Filas sandbox", len(sandbox_df))
-    with c3:
-        st.metric("Filas simuladas", len(simulated_df))
-    with c4:
-        st.metric("Sandbox activo", "SI" if st.session_state.get("sandbox_active", False) else "NO")
+        st.markdown("<b style='color:black'>Filas reales</b>", unsafe_allow_html=True)
+        st.metric("", len(base_df))
 
-    render_section_header("Vista Previa del Escenario", "Fila que se agregaría con la configuración actual (sin guardar).")
+    with c2:
+        st.markdown("<b style='color:black'>Filas sandbox</b>", unsafe_allow_html=True)
+        st.metric("", len(sandbox_df))
+
+    with c3:
+        st.markdown("<b style='color:black'>Filas simuladas</b>", unsafe_allow_html=True)
+        st.metric("", len(simulated_df))
+
+    with c4:
+        st.markdown("<b style='color:black'>Sandbox activo</b>", unsafe_allow_html=True)
+        st.metric("", "SI" if st.session_state.get("sandbox_active", False) else "NO")
     preview = _build_manual_row(sandbox_df)
     show_cols = ["timestamp", "risk_score", "risk_level"] + [c for c in SENSOR_COLUMNS if c in sandbox_df.columns]
-    st.dataframe(pd.DataFrame([preview])[show_cols], use_container_width=True)
 
     render_section_header(
         "Comparación Antes vs Después",
@@ -393,13 +397,6 @@ def render(base_df: pd.DataFrame) -> None:
             st.info(top_action.get("text", "Sin acción priorizada."))
         else:
             st.caption("No hay recomendaciones disponibles para el escenario actual.")
-
-    render_section_header(
-        "Impacto Financiero Simulado",
-        "Estimación financiera para el escenario resultante usando el mismo motor del dashboard operativo.",
-    )
-    alerts_after_df, _ = evaluate_alerts(working_after.tail(2400), thresholds=thresholds_after)
-    render_financial_section(alerts_after_df, pred_after)
 
     render_section_header("Historial de Entradas Simuladas", "Registro de los escenarios agregados en esta sesión.")
     if simulated_df.empty:

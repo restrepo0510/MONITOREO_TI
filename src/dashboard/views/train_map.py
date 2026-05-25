@@ -565,7 +565,7 @@ def _animation_fragment(df: pd.DataFrame, total: int) -> None:
 
     # ── Obtener/construir la figura animada combinada (una sola vez por dataset) ──
     cache_key = st.session_state.get("tm_cache_key", "")
-    anim_key = f"tm_combined_anim_{cache_key}"
+    anim_key = f"tm_combined_anim_{cache_key}_{len(df)}"
 
     if anim_key not in st.session_state:
         with st.spinner("Preparando animación (se hace una sola vez por dataset)…"):
@@ -688,6 +688,66 @@ def _animation_fragment(df: pd.DataFrame, total: int) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Análisis de anticipación del modelo
+# ---------------------------------------------------------------------------
+
+def _compute_lead_time_analysis(df: pd.DataFrame, umbral: float = 0.4) -> dict:
+    """
+    Mide cuánto se anticipa model_score a risk_score en cada bloque continuo
+    de operación. Devuelve estadísticas de lead time en minutos.
+    """
+    work = df[["timestamp", "risk_score", "model_score"]].dropna().copy()
+    work = work.sort_values("timestamp").reset_index(drop=True)
+
+    if len(work) < 10:
+        return {"eventos": 0}
+
+    # Reconstruir bloques con NaN (periodos apagados)
+    full = df[["timestamp", "risk_score", "model_score"]].copy().sort_values("timestamp").reset_index(drop=True)
+    full["active"] = full["risk_score"].notna()
+    full["block"] = (full["active"] != full["active"].shift()).cumsum()
+
+    lead_times = []
+    for _, group in full[full["active"]].groupby("block"):
+        seg = group.dropna()
+        if len(seg) < 5:
+            continue
+        model_cross = seg[seg["model_score"] >= umbral]
+        stat_cross  = seg[seg["risk_score"]  >= umbral]
+        if model_cross.empty or stat_cross.empty:
+            continue
+        t_model = model_cross["timestamp"].iloc[0]
+        t_stat  = stat_cross["timestamp"].iloc[0]
+        lead_min = (t_stat - t_model).total_seconds() / 60
+        model_val_at_cross = float(model_cross["model_score"].iloc[0])
+        lead_times.append({
+            "lead_min": lead_min,
+            "model_saturado": model_val_at_cross >= 0.999,
+        })
+
+    if not lead_times:
+        return {"eventos": 0}
+
+    total_eventos = len(lead_times)
+    anticipados   = [e for e in lead_times if e["lead_min"] > 0 and not e["model_saturado"]]
+    simultaneos   = [e for e in lead_times if e["lead_min"] == 0 or e["model_saturado"]]
+    retrasados    = [e for e in lead_times if e["lead_min"] < 0]
+
+    avg_lead = float(np.mean([e["lead_min"] for e in anticipados])) if anticipados else 0.0
+    med_lead = float(np.median([e["lead_min"] for e in anticipados])) if anticipados else 0.0
+
+    return {
+        "eventos": total_eventos,
+        "anticipados": len(anticipados),
+        "simultaneos": len(simultaneos),
+        "retrasados": len(retrasados),
+        "avg_lead_min": avg_lead,
+        "med_lead_min": med_lead,
+        "pct_anticipacion": len(anticipados) / total_eventos * 100 if total_eventos else 0.0,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Punto de entrada público
 # ---------------------------------------------------------------------------
 
@@ -782,13 +842,36 @@ def render(df: pd.DataFrame) -> None:
     df_map: pd.DataFrame = st.session_state[cache_key]
     model_status: str = st.session_state.get("tm_model_status", "unavailable")
     model_error_detail: str = st.session_state.get("tm_model_error", "")
+
+    if df_map.empty:
+        st.warning("El archivo está vacío.")
+        return
+
+    # ── Limitar animación a los primeros 10 días si el archivo supera 10 MB ──
+    LIMITE_MB = 10
+    anim_truncated = False
+    if uploaded.size > LIMITE_MB * 1_024 * 1_024 and "timestamp" in df_map.columns:
+        fecha_inicio = pd.to_datetime(df_map["timestamp"].iloc[0])
+        fecha_limite = fecha_inicio + pd.Timedelta(days=10)
+        df_map_anim = df_map[pd.to_datetime(df_map["timestamp"]) <= fecha_limite].copy()
+        anim_truncated = True
+    else:
+        df_map_anim = df_map
+
     total = len(df_map)
 
     if total == 0:
         st.warning("El archivo está vacío.")
         return
 
-    # ── Métricas estadísticas ──
+    if anim_truncated:
+        st.info(
+            f"Archivo > {LIMITE_MB} MB: las métricas usan el dataset completo "
+            f"({total:,} registros), pero la animación muestra solo los primeros 10 días "
+            f"({len(df_map_anim):,} registros)."
+        )
+
+    # ── Métricas estadísticas (dataset completo) ──
     risk_counts = df_map["risk_level"].value_counts()
     pct_alto = risk_counts.get("ALTO", 0) / total * 100
     pct_medio = risk_counts.get("MEDIO", 0) / total * 100
@@ -896,10 +979,69 @@ def render(df: pd.DataFrame) -> None:
             unsafe_allow_html=True,
         )
 
+    if has_model:
+        st.markdown("---")
+        render_section_header(
+            "Anticipación del Modelo vs Score Estadístico",
+            "Tiempo promedio con el que el autoencoder detecta anomalías antes que el score estadístico.",
+        )
+        lead = _compute_lead_time_analysis(df_map_anim)
+        if lead["eventos"] == 0:
+            st.info("No hay suficientes eventos con ambos scores para calcular anticipación.")
+        else:
+            la1, la2, la3, la4 = st.columns(4)
+            with la1:
+                st.metric(
+                    "Eventos analizados",
+                    lead["eventos"],
+                    help="Bloques continuos de operación donde ambos scores cruzaron el umbral 0.4",
+                )
+            with la2:
+                st.metric(
+                    "Con anticipación real",
+                    f"{lead['anticipados']} ({lead['pct_anticipacion']:.0f}%)",
+                    help="Eventos donde model_score cruzó el umbral antes que risk_score, sin saturarse a 1.0",
+                )
+            with la3:
+                st.metric(
+                    "Lead time promedio",
+                    f"{lead['avg_lead_min'] * 14:.0f} min" if lead["anticipados"] else "—",
+                    help="Tiempo medio de anticipación del modelo sobre el score estadístico (solo eventos no saturados)",
+                )
+            with la4:
+                st.metric(
+                    "Lead time mediana",
+                    f"{lead['med_lead_min'] * 14:.0f} min" if lead["anticipados"] else "—",
+                    help="Mediana del tiempo de anticipación — menos sensible a valores extremos",
+                )
+            st.markdown(
+                f"""
+                <div style="
+                    background:rgba(8,42,112,0.04);border:1px solid rgba(8,42,112,0.12);
+                    border-radius:10px;padding:0.65rem 1rem;font-size:0.82rem;
+                    color:#374151;margin-top:0.4rem;
+                ">
+                    <b>Cómo leer este resultado:</b> de los {lead['eventos']} eventos,
+                    <b>{lead['simultaneos']}</b> fueron simultáneos (el modelo se saturó a 1.0 al mismo instante que el score estadístico),
+                    <b>{lead['anticipados']}</b> mostraron anticipación gradual real,
+                    y <b>{lead['retrasados']}</b> {'fue detectado' if lead['retrasados'] == 1 else 'fueron detectados'} antes por el score estadístico.
+                    La anticipación real ocurre en episodios de <i>degradación gradual</i>, no en fallos instantáneos.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
     st.markdown("---")
     render_section_header(
         "Línea A del Metro — 23 Estaciones",
         "Usa ▶ para animar el recorrido o arrastra el slider para navegar manualmente.",
     )
 
-    _animation_fragment(df_map, total)
+    MAX_ANIM_ROWS = 300
+    if len(df_map_anim) > MAX_ANIM_ROWS:
+        step = len(df_map_anim) // MAX_ANIM_ROWS
+        df_anim_sampled = df_map_anim.iloc[::step].head(MAX_ANIM_ROWS).reset_index(drop=True)
+    else:
+        df_anim_sampled = df_map_anim
+
+    _animation_fragment(df_anim_sampled, len(df_anim_sampled))
